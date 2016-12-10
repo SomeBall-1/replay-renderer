@@ -57,9 +57,9 @@ $(document).ready(function() {
       logger.trace(`Rendering frame ${frame} of ${frames}`);
       renderer.draw(frame);
       captureFrame();
-      let frac = Math.round(frame/frames*1000)/10;
+      let frac = Math.round((frame+1)/frames*1000)/10;
       $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac); 
-      renderReplay(renderer, ++frame);
+      renderReplay(renderer,++frame,frames);
     }
   }
   
