@@ -1,5 +1,5 @@
 body {
-    padding-bottom: 150px;
+    padding-bottom: 200px;
 }
 body.modal-open {
     margin-right: auto;
@@ -8,7 +8,7 @@ nav {
     padding: 0 20px;
 }
 .main-container {
-    width: 1280px;
+    width: 1288px;
     margin: 0 auto;
 }
 .canvas-holder {

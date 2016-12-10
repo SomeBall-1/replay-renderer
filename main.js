@@ -30,20 +30,57 @@ $(document).ready(function() {
   speedpadBlue: 'resources/textures/speedpadblue.png',
   splats: 'resources/textures/splats.png',
   gravityWell: 'resources/textures/gravitywell.png',
-  flair: 'resources/textures/flair.png'};
-  window.toRender = [];
-  let rendering = false;
-  let paused = false;
-  let currentIndex = 0;
+  flair: 'resources/textures/flair.png'},
+  toRender = [],
+  renderer,
+  recorder,
+  chunks = [],
+  rendering = false,
+  paused = false,
+  currentIndex = 0;
   
-  function renderReplay(replay) {
-    
+  function saveFrame(event) {
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+      }
+  }
+  
+  function captureFrame() {
+    let recorder = new MediaRecorder($('#game')[0].captureStream(0), {mimeType: 'video/webm'});
+    recorder.ondataavailable = saveFrame;
+    recorder.start();
+    recorder.stop();
+  }
+  
+  function renderReplay(replay,frame=0,frames) {
+    for (; frame < frames; frame++) {
+      logger.trace(`Rendering frame ${frame} of ${frames}`);
+      renderer.draw(frame);
+      captureFrame();
+      let frac = Math.round(frame/frames*1000)/10;
+      $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac); 
+      renderReplay(renderer, ++frame);
+    }
   }
   
   function beginRendering() {
     rendering = true;
     while(currentIndex < toRender.length) {
-      renderReplay(toRender[currentIndex]);
+      chunks = [];
+      renderer = new Renderer($('#game')[0],toRender[currentIndex]);
+      console.log(toRender[currentIndex])
+      renderer.ready().then((function(toRender,currentIndex){
+        renderReplay(toRender[currentIndex],0,toRender[currentIndex].clock.length)
+      }).bind(null,toRender,currentIndex));
+      var blob = new Blob(chunks, {type: 'video/webm'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      document.body.appendChild(a);
+      a.href = url;
+      a.download = 'testing.webm';
+      //a.click();
+      window.URL.revokeObjectURL(url);
+      a.parentNode.removeChild(a);
       currentIndex++;
     }
   }
@@ -102,7 +139,7 @@ $(document).ready(function() {
         });
       }}
     } else if(what==='./logger') return (function() {
-      return {info: console.info};
+      return console;
     });
     else if(what==='image-promise') {
       window.loadImage = window.loadI;
@@ -114,15 +151,19 @@ $(document).ready(function() {
   
   /*FILE HANDLING STUFF*/
   function dropComplete(jsons) {
+    let anyGood = false;
     for(let i = 0;i < jsons.length;i++) {
       let flag = '';
       toRender.push(jsons[i][1]);
       if($.isEmptyObject(jsons[i][1])) flag = ' error';
+      else anyGood = true;
       $('#carousel').slick('slickAdd','<div class="filename-outer">'+
       '<div class="wrapper">'+
       '<p class="filename-inner center-text'+flag+'">'+jsons[i][0]+'</p>'+
       '</div></div>');
     }
+    console.log(anyGood);
+    if(anyGood) $('#render').removeClass('disabled');
     updateSlideCounter(false,slicker,slicker.currentSlide);
   }
   
@@ -186,10 +227,10 @@ $(document).ready(function() {
   /*END FILEHANDLING STUFF*/
   
   /*TEXTURE PICKING STUFF*/
-  window.frameWindow = document.getElementById('textureframe').contentWindow;
+  let frameWindow = document.getElementById('textureframe').contentWindow;
   $.get('http://tagpro-radius.koalabeast.com/textures/',function(response) {
     let texturepage = response;
-    texturepage = texturepage.replace(/(href|src)="\//g,'href="http://static.koalabeast.com/').replace(/id="logged-in">(.|\n|\r)*?<\/div>/,'id="logged-in">true</div>');
+    texturepage = texturepage.replace(/(href|src)="\//g,'href="https://static.koalabeast.com/').replace(/http:\/\//,'https://').replace(/id="logged-in">(.|\n|\r)*?<\/div>/,'id="logged-in">true</div>');
     frameWindow.document.open();
     frameWindow.document.write(texturepage);
     frameWindow.document.close();
@@ -198,7 +239,7 @@ $(document).ready(function() {
         for(let i = 0;i < arguments.length;i++) {
           if(typeof arguments[i]==="string" && arguments[i].match(/^name=/)) {
             let tname = 'Custom';
-            let textures = window.decodeURIComponent(arguments[i]).replace(/\/texture/g,'http://static.koalabeast.com/textures');
+            let textures = window.decodeURIComponent(arguments[i]).replace(/\/texture/g,'https://static.koalabeast.com/textures');
             textures = textures.split('&');
             for(let i = 0;i < textures.length;i++) {
               let both = textures[i].split('=');
