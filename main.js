@@ -54,7 +54,7 @@ $(document).ready(function() {
   
   function renderReplay(replay,frame=0,frames) {
     if(frame<frames) {
-      logger.trace(`Rendering frame ${frame} of ${frames}`);
+      //logger.log(`Rendering frame ${frame} of ${frames}`);
       renderer.draw(frame);
       captureFrame();
       let frac = Math.round((frame+1)/frames*1000)/10;
@@ -62,6 +62,20 @@ $(document).ready(function() {
       //return PromiseTimeout(() => render(renderer,++frame,frames)); 
       return renderReplay(renderer,++frame,frames);
     }
+    
+    console.log('Finished rendering:',currentIndex,chunks);
+    var blob = new Blob(chunks, {type: 'video/webm'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    document.body.appendChild(a);
+    a.href = url;
+    a.download = 'testing.webm';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    a.parentNode.removeChild(a);
+    
+    currentIndex++;
+    beginRendering();
   }
   
   function beginRendering() {
@@ -71,20 +85,6 @@ $(document).ready(function() {
     renderer = new Renderer($('#game')[0],toRender[currentIndex]);
     renderer.ready().then((function(toRender,currentIndex){
       renderReplay(toRender[currentIndex],0,toRender[currentIndex].clock.length);
-        
-      console.log('Finished rendering:',currentIndex,chunks);
-      var blob = new Blob(chunks, {type: 'video/webm'});
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      document.body.appendChild(a);
-      a.href = url;
-      a.download = 'testing.webm';
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.parentNode.removeChild(a);
-      
-      currentIndex++;
-      beginRendering();
     }).bind(null,toRender,currentIndex));
   }
   
