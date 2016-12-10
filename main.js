@@ -230,7 +230,8 @@ $(document).ready(function() {
   let frameWindow = document.getElementById('textureframe').contentWindow;
   $.get('http://tagpro-radius.koalabeast.com/textures/',function(response) {
     let texturepage = response;
-    texturepage = texturepage.replace(/(href|src)="\//g,'href="https://static.koalabeast.com/').replace(/http:\/\//,'https://').replace(/id="logged-in">(.|\n|\r)*?<\/div>/,'id="logged-in">true</div>');
+    texturepage = texturepage.replace(/(href|src)="\//g,'href="https://static.koalabeast.com/').replace(/http:\/\//g,'https://').replace(/id="logged-in">(.|\n|\r)*?<\/div>/,'id="logged-in">true</div>');
+    texturepage = texturepage.replace('https://tagpro-radius.koalabeast.com/compact/global-texturePackPicker.js','/resources/global-texturePackPicker.js'); //until they support https
     frameWindow.document.open();
     frameWindow.document.write(texturepage);
     frameWindow.document.close();
