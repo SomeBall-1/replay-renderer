@@ -66,26 +66,26 @@ $(document).ready(function() {
   
   function beginRendering() {
     rendering = true;
-    while(currentIndex < toRender.length) {
-      chunks = [];
-      console.log('Started rendering:',currentIndex);
-      renderer = new Renderer($('#game')[0],toRender[currentIndex]);
-      renderer.ready().then((function(toRender,currentIndex){
-        renderReplay(toRender[currentIndex],0,toRender[currentIndex].clock.length);
+    chunks = [];
+    console.log('Started rendering:',currentIndex);
+    renderer = new Renderer($('#game')[0],toRender[currentIndex]);
+    renderer.ready().then((function(toRender,currentIndex){
+      renderReplay(toRender[currentIndex],0,toRender[currentIndex].clock.length);
         
-        console.log('Finished rendering:',currentIndex,chunks);
-        var blob = new Blob(chunks, {type: 'video/webm'});
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        document.body.appendChild(a);
-        a.href = url;
-        a.download = 'testing.webm';
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.parentNode.removeChild(a);
-        currentIndex++;
-      }).bind(null,toRender,currentIndex));
-    }
+      console.log('Finished rendering:',currentIndex,chunks);
+      var blob = new Blob(chunks, {type: 'video/webm'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      document.body.appendChild(a);
+      a.href = url;
+      a.download = 'testing.webm';
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.parentNode.removeChild(a);
+      
+      currentIndex++;
+      beginRendering();
+    }).bind(null,toRender,currentIndex));
   }
   
   function pauseRendering() {
