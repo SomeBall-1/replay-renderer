@@ -39,31 +39,31 @@ $(document).ready(function() {
   paused = false,
   currentIndex = 0;
   
-  function saveFrame(event) {
+  function captureFrame(frame,frames) {
+    let recorder = new MediaRecorder($('#game')[0].captureStream(0), {mimeType: 'video/webm'});
+    recorder.ondataavailable = function(event) {
       if (event.data.size > 0) {
         chunks.push(event.data);
       }
-  }
-  
-  function captureFrame() {
-    let recorder = new MediaRecorder($('#game')[0].captureStream(0), {mimeType: 'video/webm'});
-    recorder.ondataavailable = saveFrame;
-    recorder.start();
-    recorder.stop();
-  }
-  
-  function renderReplay(replay,frame=0,frames) {
-    if(frame<frames) {
-      //logger.log(`Rendering frame ${frame} of ${frames}`);
-      renderer.draw(frame);
-      captureFrame();
+      if(recorder.state==='recording') recorder.stop();
+    }
+    recorder.onstop = function() {
       let frac = Math.round((frame+1)/frames*1000)/10;
       $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
       //return PromiseTimeout(() => render(renderer,++frame,frames)); 
-      return renderReplay(renderer,++frame,frames);
+      return renderReplay(++frame,frames);
+    }
+    recorder.start();
+  }
+  
+  function renderReplay(frame=0,frames) {
+    if(frame<frames) {
+      //logger.log(`Rendering frame ${frame} of ${frames}`);
+      renderer.draw(frame);
+      return captureFrame(frame,frames);
     }
     
-    console.log('Finished rendering:',currentIndex,chunks);
+    console.log('Finished rendering:',currentIndex,'at frame:',frame+1,chunks);
     var blob = new Blob(chunks, {type: 'video/webm'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -79,13 +79,17 @@ $(document).ready(function() {
   }
   
   function beginRendering() {
-    rendering = true;
-    chunks = [];
-    console.log('Started rendering:',currentIndex);
-    renderer = new Renderer($('#game')[0],toRender[currentIndex]);
-    renderer.ready().then((function(toRender,currentIndex){
-      renderReplay(toRender[currentIndex],0,toRender[currentIndex].clock.length);
-    }).bind(null,toRender,currentIndex));
+    if(currentIndex<toRender.length) {
+      rendering = true;
+      chunks = [];
+      console.log('Started rendering:',currentIndex);
+      renderer = new Renderer($('#game')[0],toRender[currentIndex]);
+      renderer.ready().then((function(toRender,currentIndex){
+        renderReplay(0,toRender[currentIndex].clock.length);
+      }).bind(null,toRender,currentIndex));
+    } else {
+      console.log('No more replays to render');
+    }
   }
   
   function pauseRendering() {
