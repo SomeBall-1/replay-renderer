@@ -58,7 +58,8 @@ $(document).ready(function() {
       renderer.draw(frame);
       captureFrame();
       let frac = Math.round((frame+1)/frames*1000)/10;
-      $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac); 
+      $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
+      //return PromiseTimeout(() => render(renderer,++frame,frames)); 
       renderReplay(renderer,++frame,frames);
     }
   }
@@ -67,18 +68,19 @@ $(document).ready(function() {
     rendering = true;
     while(currentIndex < toRender.length) {
       chunks = [];
+      console.log('Started rendering:',currentIndex);
       renderer = new Renderer($('#game')[0],toRender[currentIndex]);
-      console.log(toRender[currentIndex])
       renderer.ready().then((function(toRender,currentIndex){
         renderReplay(toRender[currentIndex],0,toRender[currentIndex].clock.length)
       }).bind(null,toRender,currentIndex));
+      console.log('Finished rendering:',currentIndex,chunks);
       var blob = new Blob(chunks, {type: 'video/webm'});
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       document.body.appendChild(a);
       a.href = url;
       a.download = 'testing.webm';
-      //a.click();
+      a.click();
       window.URL.revokeObjectURL(url);
       a.parentNode.removeChild(a);
       currentIndex++;
@@ -162,7 +164,6 @@ $(document).ready(function() {
       '<p class="filename-inner center-text'+flag+'">'+jsons[i][0]+'</p>'+
       '</div></div>');
     }
-    console.log(anyGood);
     if(anyGood) $('#render').removeClass('disabled');
     updateSlideCounter(false,slicker,slicker.currentSlide);
   }
