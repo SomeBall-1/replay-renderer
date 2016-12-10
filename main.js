@@ -53,7 +53,7 @@ $(document).ready(function() {
   }
   
   function renderReplay(replay,frame=0,frames) {
-    for (; frame < frames; frame++) {
+    if(frame<frames) {
       logger.trace(`Rendering frame ${frame} of ${frames}`);
       renderer.draw(frame);
       captureFrame();
@@ -231,7 +231,7 @@ $(document).ready(function() {
   $.get('http://tagpro-radius.koalabeast.com/textures/',function(response) {
     let texturepage = response;
     texturepage = texturepage.replace(/(href|src)="\//g,'href="https://static.koalabeast.com/').replace(/http:\/\//g,'https://').replace(/id="logged-in">(.|\n|\r)*?<\/div>/,'id="logged-in">true</div>');
-    texturepage = texturepage.replace('https://tagpro-radius.koalabeast.com/compact/global-texturePackPicker.js','/replay-renderer/resources/global-texturePackPicker.js'); //until they support https
+    texturepage = texturepage.replace('https://tagpro-radius.koalabeast.com/compact/global-texturePackPicker.js','./resources/global-texturePackPicker.js'); //until they support https
     frameWindow.document.open();
     frameWindow.document.write(texturepage);
     frameWindow.document.close();
@@ -240,7 +240,7 @@ $(document).ready(function() {
         for(let i = 0;i < arguments.length;i++) {
           if(typeof arguments[i]==="string" && arguments[i].match(/^name=/)) {
             let tname = 'Custom';
-            let textures = window.decodeURIComponent(arguments[i]).replace(/\/texture/g,'https://static.koalabeast.com/textures');
+            let textures = window.decodeURIComponent(arguments[i]).replace(/\/textures/g,'https://static.koalabeast.com/textures');
             textures = textures.split('&');
             for(let i = 0;i < textures.length;i++) {
               let both = textures[i].split('=');
