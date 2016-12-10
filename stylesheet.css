@@ -1,0 +1,145 @@
+body {
+    padding-bottom: 150px;
+}
+body.modal-open {
+    margin-right: auto;
+}
+nav {
+    padding: 0 20px;
+}
+.main-container {
+    width: 1280px;
+    margin: 0 auto;
+}
+.canvas-holder {
+    border: 4px solid gray;
+}
+.carousel-holder {
+    border: 1px solid gray;
+    border-radius: 4px;
+    height: 75px;
+    margin: 0 15px 20px 15px;
+}
+#carousel {
+    height: 100%;
+}
+.footer {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+p {
+    margin: 0;
+}
+.progress {
+    margin: 10px 15px 20px 15px;
+}
+label {
+    font-weight: normal;
+    color: black;
+    margin-bottom: 0;
+}
+input[type=checkbox][disabled] + label {
+    color: gray;
+}
+.panel.overflowoverride {
+    overflow: visible;
+}
+#textureframe {
+    width: 90%;
+    height: 90%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: auto;
+    z-index: 1050;
+}
+.center-text {
+    text-align: center;
+}
+
+/* FILEDRAG OVERLAY */
+#filedrag {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 90%;
+    height: 90%;
+    margin: auto;
+    border: 5px solid black;
+    border-radius: 20px;
+    background-color: rgba(100,100,100,0.75);
+    z-index: 1001;
+}
+#filedrag > div {
+    margin: auto;
+}
+#filedrag b {
+    font-size: 3em;
+    color: black;
+}
+
+/* CAROUSEL */
+button.slick-prev::before, button.slick-next::before {
+    color: gray;
+}
+.slick-center p {
+    transform: scale(1.25);
+    font-weight: bold;
+}
+.wrapper {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.filename-outer {
+    margin: 0 20px;
+}
+.filename-inner {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; 
+    word-wrap: break-word;
+    cursor: pointer;
+}
+p.current {
+    color: #337ab7;
+}
+p.error {
+    color: #d9534f;
+    /*color: #5cb85c;*/ /*green done color*/
+}
+/*#fade-left, #fade-right {
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+}
+#fade-left {
+    display: block;
+    position: absolute;
+    top: 10%;
+    background-image: linear-gradient(to left, rgba(255, 255, 255, 0) 0, #fff 75%);
+    height: 80%;
+    width: 15%;
+    content: '';
+    pointer-events: none;
+}
+#fade-right {
+    display: block;
+    position: absolute;
+    top: 10%;
+    right: 0;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0) 0, #fff 75%);
+    height: 80%;
+    width: 15%;
+    content: '';
+    pointer-events: none;
+}*/

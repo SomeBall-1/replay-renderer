@@ -1,0 +1,93 @@
+<head>
+  <meta charset="UTF-8">
+  <title>TagPro Replay Renderer</title>
+  <script src="resources/jquery.min.js"></script> <!--v3.1.1-->
+  <script src="main.js"></script>
+  <script src="resources/bootstrap.min.js"></script> <!--v3.0.0-->
+  <link rel="stylesheet" href="resources/bootstrap.min.css">
+  <link rel="stylesheet" href="resources/bootstrap-theme.min.css">
+  <script src="resources/slick.js"></script> <!--v1.6.0-->
+  <link rel="stylesheet" href="resources/slick.css">
+  <link rel="stylesheet" href="resources/slick-theme.css">
+  <link href="stylesheet.css" rel="stylesheet">
+  <script src="resources/moment.js"></script>
+  <script src="resources/moment-duration-format.js"></script>
+  <script src="resources/image-promise.browser.js"></script>
+  <script>
+    $(document).ready(function wait() {
+      if(!window.require) return setTimeout(wait);
+      var script = document.createElement('script');
+      script.src = "renderer.js";
+      document.body.appendChild(script);
+    });
+  </script>
+</head>
+<body>
+  <h1 class="center-text">TagPro Replay Renderer</h1>
+  <div class="main-container" width="1280px" height="800px">
+    <div class="canvas-holder">
+      <canvas id="game" width="1280px" height="800px"></canvas>
+    </div>
+    <nav class="navbar navbar-default navbar-fixed-bottom">
+      <div class="progress">
+        <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+        </div>
+      </div>
+      <div class="carousel-holder">
+        <div id="carousel">
+        </div>
+      </div>
+      <div class="footer center-text">
+        <div class="col-md-4">
+          <button id="render" class="btn btn-success disabled">Render</button>
+          <button id="stop" class="btn btn-danger disabled">Stop</button>
+        </div>
+        <p id="counter" class="col-md-4">No Replays Loaded</p>
+        <div class="col-md-4">
+          <button class="btn btn-default" data-target="#options" data-toggle="modal">Render Options</button>
+        </div>
+      </div>
+    </nav>
+  </div>
+  <div id="filedrag" style="display: none;">
+    <div>
+      <b>Drop Replay Files Here</b>
+    </div>
+  </div>
+  <div class="modal fade" id="options" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+          <h4 class="modal-title" id="optionsLabel">Render Options</h4>
+          <p>Changes are saved automatically</p>
+        </div>
+        <div class="modal-body panel-group" id="accordion">
+          <div class="panel panel-default">
+            <div class="panel-heading">Download Options</div>
+            <div class="panel-body">
+              <div class="col-md-6">
+                <input type="checkbox" id="downloadeach" value="">
+                <label for="downloadeach">.webm after each render</label>
+              </div>
+              <div class="col-md-6">
+                <input type="checkbox" id="downloadzip" value="" style="margin-left: 50px" checked disabled>
+                <label for="downloadzip">.zip on total completion</label>
+              </div>
+            </div>
+          </div>
+          <div class="panel panel-default overflowoverride">
+            <div class="panel-heading"><p id="tname">Current Texture Pack: Classic</p></div>
+            <div class="panel-body center-text">
+              <button class="btn btn-default" data-target="#textureframe" data-toggle="modal" onclick="$('#options').modal('hide')">Choose Texture Pack</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <iframe id="textureframe" class="modal"></iframe>
+</body>
