@@ -42,7 +42,7 @@ $(document).ready(function() {
   function captureFrame(frame,frames) {
     let recorder = new MediaRecorder($('#game')[0].captureStream(0), {mimeType: 'video/webm'});
     recorder.ondataavailable = function(event) {
-      if (event.data.size > 0) {
+      if(event.data && event.data.size > 0) {
         chunks.push(event.data);
       }
       if(recorder.state==='recording') recorder.stop();
@@ -50,8 +50,7 @@ $(document).ready(function() {
     recorder.onstop = function() {
       let frac = Math.round((frame+1)/frames*1000)/10;
       $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
-      //return PromiseTimeout(() => render(renderer,++frame,frames)); 
-      return renderReplay(++frame,frames);
+      return window.requestAnimationFrame(renderReplay.bind(this,++frame,frames));
     }
     recorder.start();
   }
@@ -63,7 +62,8 @@ $(document).ready(function() {
       return captureFrame(frame,frames);
     }
     
-    console.log('Finished rendering:',currentIndex,'at frame:',frame+1,chunks);
+    console.log('Finished rendering:',currentIndex,'at frame:',frame,chunks);
+    window.chunky = chunks;
     var blob = new Blob(chunks, {type: 'video/webm'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -88,6 +88,7 @@ $(document).ready(function() {
         renderReplay(0,toRender[currentIndex].clock.length);
       }).bind(null,toRender,currentIndex));
     } else {
+      rendering = false;
       console.log('No more replays to render');
     }
   }
