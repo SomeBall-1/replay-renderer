@@ -55,23 +55,22 @@
     </div>
   </div>
   <div class="modal fade" id="options" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog" role="document">
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
           <h4 class="modal-title">Render Options</h4>
-          <p>Changes are saved automatically</p>
         </div>
         <div class="modal-body panel-group">
           <div class="panel panel-default">
             <div class="panel-heading">Download Options</div>
             <div class="panel-body text-center">
               <div class="col-md-6">
-                <input type="checkbox" id="downloadeach" value="">
+                <input type="checkbox" id="downloadeach" value="webm" class="setting">
                 <label for="downloadeach">.webm after each render</label>
               </div>
               <div class="col-md-6">
-                <input type="checkbox" id="downloadzip" value="" checked disabled>
+                <input type="checkbox" id="downloadzip" value="zip" class="setting" checked disabled>
                 <label for="downloadzip">.zip on total completion</label>
               </div>
             </div>
@@ -80,19 +79,19 @@
             <div class="panel-heading">Render Options</div>
             <div class="panel-body text-center">
               <div class="col-md-3">
-                <input type="checkbox" id="showspin" value="">
+                <input type="checkbox" id="showspin" value="spin" class="setting">
                 <label for="showspin">Show Spin</label>
               </div>
               <div class="col-md-3">
-                <input type="checkbox" id="showsplats" value="">
+                <input type="checkbox" id="showsplats" value="splats" class="setting">
                 <label for="showsplats">Show Splats</label>
               </div>
               <div class="col-md-3">
-                <input type="checkbox" id="showui" value="">
+                <input type="checkbox" id="showui" value="ui" class="setting" checked>
                 <label for="showui">Show UI</label>
               </div>
               <div class="col-md-3">
-                <input type="checkbox" id="showchat" value="">
+                <input type="checkbox" id="showchat" value="chat" class="setting" checked>
                 <label for="showchat">Show Chat</label>
               </div>
             </div>
@@ -100,18 +99,19 @@
           <div class="panel panel-default overflowoverride">
             <div class="panel-heading"><p id="tname">Current Texture Pack: Classic</p></div>
             <div class="panel-body center-text">
-              <button class="btn btn-default" data-target="#texturemodal" data-toggle="modal" onclick="$('#options').modal('hide')">Choose Texture Pack</button>
+              <button class="btn btn-default" data-target="#texturemodal" data-toggle="modal" onclick="$('#options').addClass('ignore-hide').modal('hide')">Choose Texture Pack</button>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" id="save">Save Settings</button>
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
         </div>
       </div>
     </div>
   </div>
   <div class="modal fade" id="texturemodal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog custom">
+    <div class="modal-dialog custom" role="document">
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>

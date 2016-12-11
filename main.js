@@ -1,4 +1,50 @@
 $(document).ready(function() {
+  /*VARIABLES*/
+  let texturePack = {
+    name: 'Classic',
+    tiles: 'resources/textures/tiles.png',
+    portal: 'resources/textures/portal.png',
+    speedpad: 'resources/textures/speedpad.png',
+    speedpadRed: 'resources/textures/speedpadred.png',
+    speedpadBlue: 'resources/textures/speedpadblue.png',
+    splats: 'resources/textures/splats.png',
+    gravityWell: 'https://static.koalabeast.com/images/gravitywell.png',//'resources/textures/gravitywell.png',
+    flair: 'https://static.koalabeast.com/images/flair.png',//'resources/textures/flair.png'
+  },
+  tempTexturePack = $.extend({},texturePack),
+  settings = {
+    webm: false,
+    zip: true,
+    spin: false,
+    splats: false,
+    ui: true,
+    chat: true,
+  },
+  frameWindow = document.getElementById('textureframe').contentWindow,
+  toRender = [],
+  renderer,
+  recorder = {},
+  chunks = [],
+  currentFrame = -1,
+  currentMaxFrames = -1,
+  currentFpsDelay = -1,
+  currentIndex = -1,
+  rendering = false,
+  paused = false,
+  inactive = true;
+  
+  let temp = sessionStorage.getItem('settings') || '{}';
+  settings = $.parseJSON(temp);
+  temp = sessionStorage.getItem('texturepack') || '{}';
+  texturePack = $.parseJSON(temp);
+  $('.setting').each(function(i,elem) {
+    elem.checked = settings[elem.value];
+  });
+  if($('#downloadeach').prop('checked')) $('#downloadzip').prop('disabled', false);
+  $('#tname').text('Current Texture Pack: '+texturePack.name);
+  /*END VARIABLES*/
+  
+  
   /*CAROUSEL STUFF */
   $('#carousel').slick({
     centerMode: true,
@@ -12,37 +58,7 @@ $(document).ready(function() {
   $('#carousel').on('afterChange',updateSlideCounter);
   /*END CAROUSEL STUFF*/
   
-  /*DOWNLOAD STUFF*/
-  $('#downloadeach').change(function() {
-    if($(this).prop('checked')) {
-      $('#downloadzip').prop('disabled',false);
-    } else {
-      $('#downloadzip').prop({'checked': true, 'disabled': true});
-    }
-  });
-  /*END DOWNLOAD STUFF*/
-  
   /*RENDERING STUFF*/
-  let texturePack = {tiles: 'resources/textures/tiles.png',
-  portal: 'resources/textures/portal.png',
-  speedpad: 'resources/textures/speedpad.png',
-  speedpadRed: 'resources/textures/speedpadred.png',
-  speedpadBlue: 'resources/textures/speedpadblue.png',
-  splats: 'resources/textures/splats.png',
-  gravityWell: 'resources/textures/gravitywell.png',
-  flair: 'resources/textures/flair.png'},
-  toRender = [],
-  renderer,
-  recorder = {},
-  chunks = [],
-  currentFrame = -1,
-  currentMaxFrames = -1,
-  currentFpsDelay = -1,
-  currentIndex = -1,
-  rendering = false,
-  paused = false,
-  inactive = true;
-  
   function renderReplay(frame=0,frames,fpsDelay) {
     if(!paused && !inactive) {
       if(frame<frames) {
@@ -70,12 +86,7 @@ $(document).ready(function() {
       inactive = false;
       chunks = [];
       console.log('Started rendering:',currentIndex);
-      renderer = new Renderer($('#game')[0],toRender[currentIndex],{
-        spin: $('#showspin').prop('checked'),
-        splats: $('#showsplats').prop('checked'),
-        ui: $('#showui').prop('checked'),
-        chat: $('#showchat').prop('checked'),
-      });
+      renderer = new Renderer($('#game')[0],toRender[currentIndex],settings);
       renderer.ready().then((function(toRender,currentIndex){
         recorder = new MediaRecorder($('#game')[0].captureStream(), {mimeType: 'video/webm'});
         recorder.ondataavailable = function(event) {
@@ -170,7 +181,7 @@ $(document).ready(function() {
     }
   });
   
-  //for tricking the renderer into working
+  //for tricking the renderer.js into working
   window.module = {};
   window.require = function(what) {
     if(what==='./textures') {
@@ -181,14 +192,16 @@ $(document).ready(function() {
         return prom.then(function() {
           let urls = [];
           for (let name in texturePack) {
-            urls.push(texturePack[name]);
+            if(name!=='name') urls.push(texturePack[name]);
           }
           return loadImage(urls);
         }).then(function(images) {
           let out = {};
-          let keys = Object.keys(texturePack)
-          for (let i = 0; i < images.length; i++) {
-            out[keys[i]] = images[i];
+          let keys = Object.keys(texturePack);
+          let discount = 0;
+          for (let i = 0; i < keys.length; i++) {
+            if(keys[i]!=='name') out[keys[i]] = images[i-discount];
+            else discount++;
           }
           return out;
         });
@@ -279,8 +292,42 @@ $(document).ready(function() {
   });
   /*END FILEHANDLING STUFF*/
   
-  /*TEXTURE PICKING STUFF*/
-  let frameWindow = document.getElementById('textureframe').contentWindow;
+  /*SETTINGS AND TEXTURE PICKING STUFF*/
+  $('#save').click(function() {
+    $('#options').addClass('ignore-hide').modal('hide');
+    $('.setting').each(function(i,elem) {
+      settings[elem.value] = elem.checked;
+    });
+    texturePack = $.extend({},tempTexturePack);
+    $('#tname').text('Current Texture Pack: '+texturePack.name);
+    sessionStorage.setItem('settings',JSON.stringify(settings));
+    sessionStorage.setItem('texturepack',JSON.stringify(texturePack));
+  });
+  $('#options').on('hidden.bs.modal',function() {
+    if(!$(this).hasClass('ignore-hide')) {
+      $('.setting').each(function(i,elem) {
+        elem.checked = settings[elem.value];
+      });
+      $('#tname').text('Current Texture Pack: '+texturePack.name);
+      frameWindow.$(".texture-choice").removeClass("active-pack");
+      frameWindow.$(".texture-choice[data-name='"+texturePack.name+"']").addClass("active-pack");
+      if(!$('#downloadeach').prop('checked')) $('#downloadzip').prop({'checked': true, 'disabled': true});
+    }
+    $(this).removeClass('ignore-hide');
+  });
+  
+  $('#downloadeach').change(function() {
+    if($(this).prop('checked')) {
+      $('#downloadzip').prop('disabled',false);
+    } else {
+      $('#downloadzip').prop({'checked': true, 'disabled': true});
+    }
+  });
+  
+  $('#texturemodal').on('hide.bs.modal',function() {
+    $('#options').modal('show');
+  });
+  
   $.get('http://tagpro-radius.koalabeast.com/textures/',function(response) {
     let texturepage = response;
     texturepage = texturepage.replace(/(href|src)="\//g,'href="https://static.koalabeast.com/').replace(/http:\/\//g,'https://').replace(/id="logged-in">(.|\n|\r)*?<\/div>/,'id="logged-in">true</div>');
@@ -292,19 +339,18 @@ $(document).ready(function() {
       frameWindow.XMLHttpRequest.prototype.send = function(e) {
         for(let i = 0;i < arguments.length;i++) {
           if(typeof arguments[i]==="string" && arguments[i].match(/^name=/)) {
-            let tname = 'Custom';
             let textures = window.decodeURIComponent(arguments[i]).replace(/\/textures/g,'https://static.koalabeast.com/textures');
             textures = textures.split('&');
             for(let i = 0;i < textures.length;i++) {
               let both = textures[i].split('=');
-              if(texturePack[both[0]]) texturePack[both[0]] = both[1];
-              else if(both[0]==='name' && both[1]!=='custom') tname = both[1];
+              if(both[0]==='name') tempTexturePack['name'] = both[1].replace(/\+/g,' ');
+              else if(tempTexturePack[both[0]]) tempTexturePack[both[0]] = both[1];
             }
+            if(tempTexturePack['name']==='custom') tempTexturePack['name'] = 'Custom';
             $('#texturemodal').modal('hide');
-            $('#options').modal('show');
-            $('#tname').text('Current Texture Pack: '+tname);
+            $('#tname').text('Current Texture Pack: '+tempTexturePack.name);
             frameWindow.$(".texture-choice").removeClass("active-pack");
-            frameWindow.$(".texture-choice[data-name='"+tname+"']").addClass("active-pack");
+            frameWindow.$(".texture-choice[data-name='"+tempTexturePack.name+"']").addClass("active-pack");
           }
         }
       };
@@ -313,7 +359,7 @@ $(document).ready(function() {
   document.getElementById('textureframe').onload = function() {
     frameWindow.$('#header, .footer').remove();
     frameWindow.document.body.style.marginBottom = 0;
-    frameWindow.$(".texture-choice[data-name='Classic']").addClass("active-pack");
+    frameWindow.$(".texture-choice[data-name='"+texturePack.name+"']").addClass("active-pack");
   }
-  /*END TEXTURE PICKING STUFF*/
+  /*END SETTINGS AND TEXTURE PICKING STUFF*/
 });
