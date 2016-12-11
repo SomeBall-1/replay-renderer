@@ -33,49 +33,52 @@ $(document).ready(function() {
   flair: 'resources/textures/flair.png'},
   toRender = [],
   renderer,
-  recorder,
+  recorder = {},
   chunks = [],
   rendering = false,
   paused = false,
   currentIndex = 0;
   
   function captureFrame(frame,frames) {
-    let recorder = new MediaRecorder($('#game')[0].captureStream(0), {mimeType: 'video/webm'});
-    recorder.ondataavailable = function(event) {
-      if(event.data && event.data.size > 0) {
-        chunks.push(event.data);
-      }
-      if(recorder.state==='recording') recorder.stop();
-    }
-    recorder.onstop = function() {
-      let frac = Math.round((frame+1)/frames*1000)/10;
-      $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
-      return window.requestAnimationFrame(renderReplay.bind(this,++frame,frames));
-    }
-    recorder.start();
+    
   }
   
-  function renderReplay(frame=0,frames) {
+  function renderReplay(frame=0,frames,fpsDelay) {
     if(frame<frames) {
       //logger.log(`Rendering frame ${frame} of ${frames}`);
+      if(frame===0) {
+        recorder = new MediaRecorder($('#game')[0].captureStream(), {mimeType: 'video/webm'});
+        recorder.ondataavailable = function(event) {
+          if(event.data && event.data.size > 0) {
+            chunks.push(event.data);
+          }
+        }
+        recorder.onstop = function() {
+          console.log('Finished rendering:',currentIndex,'at:',frame,chunks);
+          window.chunky = chunks;
+          var blob = new Blob(chunks, {type: 'video/webm'});
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          document.body.appendChild(a);
+          a.href = url;
+          a.download = 'testing.webm';
+          a.click();
+          window.URL.revokeObjectURL(url);
+          a.parentNode.removeChild(a);
+    
+          currentIndex++;
+          beginRendering();
+        }
+        recorder.start();
+      }
       renderer.draw(frame);
-      return captureFrame(frame,frames);
+      let frac = Math.round((frame+1)/frames*1000)/10;
+      $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
+      return setTimeout(function(frame,frames,fpsDelay) {
+        window.requestAnimationFrame(renderReplay.bind(this,frame,frames,fpsDelay));
+      },fpsDelay,++frame,frames,fpsDelay);
     }
-    
-    console.log('Finished rendering:',currentIndex,'at frame:',frame,chunks);
-    window.chunky = chunks;
-    var blob = new Blob(chunks, {type: 'video/webm'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    document.body.appendChild(a);
-    a.href = url;
-    a.download = 'testing.webm';
-    a.click();
-    window.URL.revokeObjectURL(url);
-    a.parentNode.removeChild(a);
-    
-    currentIndex++;
-    beginRendering();
+    recorder.stop();
   }
   
   function beginRendering() {
@@ -83,10 +86,18 @@ $(document).ready(function() {
       rendering = true;
       chunks = [];
       console.log('Started rendering:',currentIndex);
-      renderer = new Renderer($('#game')[0],toRender[currentIndex]);
+      renderer = new Renderer($('#game')[0],toRender[currentIndex],{
+        spin: $('#showspin').prop('checked'),
+        splats: $('#showsplats').prop('checked'),
+        ui: $('#showui').prop('checked'),
+        chat: $('#showchat').prop('checked'),
+      });
       renderer.ready().then((function(toRender,currentIndex){
-        renderReplay(0,toRender[currentIndex].clock.length);
-      }).bind(null,toRender,currentIndex));
+        let replay = toRender[currentIndex],
+          me = Object.keys(replay).find(k => replay[k].me == 'me'),
+          fps = replay[me].fps;
+        renderReplay(0,replay.clock.length,1000/fps);
+      }).bind(this,toRender,currentIndex));
     } else {
       rendering = false;
       console.log('No more replays to render');
