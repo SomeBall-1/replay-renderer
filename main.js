@@ -175,7 +175,7 @@ $(document).ready(function() {
   window.require = function(what) {
     if(what==='./textures') {
       return {get: function() {
-        let prom = new Promise(function(resolve,reject) {
+        let prom = new Promise(function(resolve,reject) { //idk how to use promises...
           resolve(true);
         })
         return prom.then(function() {
@@ -188,7 +188,6 @@ $(document).ready(function() {
           let out = {};
           let keys = Object.keys(texturePack)
           for (let i = 0; i < images.length; i++) {
-            images[i].crossOrigin = 'anonymous';
             out[keys[i]] = images[i];
           }
           return out;
@@ -198,8 +197,7 @@ $(document).ready(function() {
       return console;
     });
     else if(what==='image-promise') {
-      window.loadImage = window.loadI;
-      return window.loadImage;
+      return window.loadI;
     }
     else if(what==='moment') return window.moment;
   }
