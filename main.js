@@ -35,55 +35,39 @@ $(document).ready(function() {
   renderer,
   recorder = {},
   chunks = [],
+  currentFrame = -1,
+  currentMaxFrames = -1,
+  currentFpsDelay = -1,
+  currentIndex = -1,
   rendering = false,
   paused = false,
-  currentIndex = 0;
-  
-  function captureFrame(frame,frames) {
-    
-  }
+  inactive = true;
   
   function renderReplay(frame=0,frames,fpsDelay) {
-    if(frame<frames) {
-      //logger.log(`Rendering frame ${frame} of ${frames}`);
-      if(frame===0) {
-        recorder = new MediaRecorder($('#game')[0].captureStream(), {mimeType: 'video/webm'});
-        recorder.ondataavailable = function(event) {
-          if(event.data && event.data.size > 0) {
-            chunks.push(event.data);
-          }
+    if(!paused && !inactive) {
+      if(frame<frames) {
+        currentFrame = frame;
+        //logger.log(`Rendering frame ${frame} of ${frames}`);
+        renderer.draw(frame);
+        if(((frame+1)%(frames/20))<1) { //%every ~5%
+          let frac = (frame+1)/frames*100;
+          $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
         }
-        recorder.onstop = function() {
-          console.log('Finished rendering:',currentIndex,'at:',frame,chunks);
-          window.chunky = chunks;
-          var blob = new Blob(chunks, {type: 'video/webm'});
-          var url = URL.createObjectURL(blob);
-          var a = document.createElement('a');
-          document.body.appendChild(a);
-          a.href = url;
-          a.download = 'testing.webm';
-          a.click();
-          window.URL.revokeObjectURL(url);
-          a.parentNode.removeChild(a);
-    
-          currentIndex++;
-          beginRendering();
-        }
-        recorder.start();
+        
+        return setTimeout(function(frame,frames,fpsDelay) {
+          window.requestAnimationFrame(renderReplay.bind(this,frame,frames,fpsDelay));
+        },fpsDelay,++frame,frames,fpsDelay);
       }
-      renderer.draw(frame);
-      let frac = Math.round((frame+1)/frames*1000)/10;
-      $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
-      return setTimeout(function(frame,frames,fpsDelay) {
-        window.requestAnimationFrame(renderReplay.bind(this,frame,frames,fpsDelay));
-      },fpsDelay,++frame,frames,fpsDelay);
+      $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
+      recorder.stop();
+      currentFrame = -1;
     }
-    recorder.stop();
   }
   
-  function beginRendering() {
+  function beginRendering(currentIndex) {
     if(currentIndex<toRender.length) {
       rendering = true;
+      inactive = false;
       chunks = [];
       console.log('Started rendering:',currentIndex);
       renderer = new Renderer($('#game')[0],toRender[currentIndex],{
@@ -93,25 +77,66 @@ $(document).ready(function() {
         chat: $('#showchat').prop('checked'),
       });
       renderer.ready().then((function(toRender,currentIndex){
+        recorder = new MediaRecorder($('#game')[0].captureStream(), {mimeType: 'video/webm'});
+        recorder.ondataavailable = function(event) {
+          if(event.data && event.data.size > 0) {
+            chunks.push(event.data);
+          }
+        }
+        recorder.onstop = function() {
+          console.log('Finished rendering:',currentIndex,'at:',frame,chunks);
+          window.chunky = chunks;
+          let blob = new Blob(chunks, {type: 'video/webm'});
+          let url = URL.createObjectURL(blob);
+          let a = document.createElement('a');
+          document.body.appendChild(a);
+          a.href = url;
+          let filename = slicker.$slides.eq(currentIndex).find('p').text();
+          filename = filename.substring(0,filename.lastIndexOf('.'));
+          a.download = filename+'.webm';
+          a.click();
+          window.URL.revokeObjectURL(url);
+          a.parentNode.removeChild(a);
+          
+          if(!inactive) beginRendering(++currentIndex);
+        }
+        $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
+        recorder.start();
+        
         let replay = toRender[currentIndex],
           me = Object.keys(replay).find(k => replay[k].me == 'me'),
-          fps = replay[me].fps;
-        renderReplay(0,replay.clock.length,1000/fps);
+          fps = replay[me].fps+1; //+1 because setTimeout seems a little slow
+        currentFrame = 0;
+        currentMaxFrames = replay.clock.length;
+        currentFpsDelay = 1000/fps;
+        window.requestAnimationFrame(renderReplay.bind(this,currentFrame,currentMaxFrames,currentFpsDelay));
       }).bind(this,toRender,currentIndex));
     } else {
       rendering = false;
+      inactive = true;
+      $('#render').addClass('btn-success').removeClass('btn-primary').text('Render');
+      $('#stop').addClass('disabled');
       console.log('No more replays to render');
     }
   }
   
   function pauseRendering() {
-    rendering = false;
-    paused = true;
+    if(recorder.state==='recording') {
+      recorder.pause();
+      $('#render').text('Resume');
+      rendering = false;
+      paused = true;
+    }
   }
   
   function resumeRendering() {
-    rendering = true;
-    paused = false;
+    if(recorder.state==='paused') {
+      $('#render').text('Pause');
+      rendering = true;
+      paused = false;
+      recorder.resume();
+      window.requestAnimationFrame(renderReplay.bind(this,++currentFrame,currentMaxFrames,currentFpsDelay));
+    }
   }
   
   $('#render').click(function(e) {
@@ -119,8 +144,20 @@ $(document).ready(function() {
       pauseRendering();
     } else if(paused) {
       resumeRendering();
-    } else {
-      beginRendering();
+    } else if(inactive) {
+      currentIndex = slicker.currentSlide;
+      beginRendering(currentIndex);
+      $('#render').addClass('btn-primary').removeClass('btn-success').text('Pause');
+      $('#stop').removeClass('disabled');
+    }
+  });
+  $('#stop').click(function(e) {
+    if(rendering || paused) {
+      rendering = false;
+      inactive = true;
+      recorder.stop();
+      $('#render').addClass('btn-success').removeClass('btn-primary').text('Render');
+      $('#stop').addClass('disabled');
     }
   });
   /*END RENDERING STUFF*/
@@ -253,7 +290,7 @@ $(document).ready(function() {
     frameWindow.document.open();
     frameWindow.document.write(texturepage);
     frameWindow.document.close();
-    (function(send) {
+    (function(send) { //intercept POSTs to prevent errors and to see when they select a new texture pack
       frameWindow.XMLHttpRequest.prototype.send = function(e) {
         for(let i = 0;i < arguments.length;i++) {
           if(typeof arguments[i]==="string" && arguments[i].match(/^name=/)) {
@@ -265,7 +302,7 @@ $(document).ready(function() {
               if(texturePack[both[0]]) texturePack[both[0]] = both[1];
               else if(both[0]==='name' && both[1]!=='custom') tname = both[1];
             }
-            $('#textureframe').modal('hide');
+            $('#texturemodal').modal('hide');
             $('#options').modal('show');
             $('#tname').text('Current Texture Pack: '+tname);
             frameWindow.$(".texture-choice").removeClass("active-pack");

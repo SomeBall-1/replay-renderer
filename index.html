@@ -59,7 +59,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-          <h4 class="modal-title" id="optionsLabel">Render Options</h4>
+          <h4 class="modal-title">Render Options</h4>
           <p>Changes are saved automatically</p>
         </div>
         <div class="modal-body panel-group">
@@ -100,7 +100,7 @@
           <div class="panel panel-default overflowoverride">
             <div class="panel-heading"><p id="tname">Current Texture Pack: Classic</p></div>
             <div class="panel-body center-text">
-              <button class="btn btn-default" data-target="#textureframe" data-toggle="modal" onclick="$('#options').modal('hide')">Choose Texture Pack</button>
+              <button class="btn btn-default" data-target="#texturemodal" data-toggle="modal" onclick="$('#options').modal('hide')">Choose Texture Pack</button>
             </div>
           </div>
         </div>
@@ -110,5 +110,17 @@
       </div>
     </div>
   </div>
-  <iframe id="textureframe" class="modal"></iframe>
+  <div class="modal fade" id="texturemodal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog custom">
+      <div class="modal-content">
+        <div class="modal-header no-border">
+          <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+          <h4 class="modal-title">Choose a Texture Pack</h4>
+        </div>
+        <div class="modal-body">
+          <iframe id="textureframe" class="modal-dialog"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>

@@ -34,6 +34,9 @@ p {
 .progress {
     margin: 10px 15px 20px 15px;
 }
+div.progress-bar {
+    transition: none;
+}
 label {
     font-weight: normal;
     color: black;
@@ -46,18 +49,19 @@ input[type=checkbox][disabled] + label {
     overflow: visible;
 }
 #textureframe {
-    width: 90%;
-    height: 90%;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    margin: auto;
-    z-index: 1050;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+}
+.no-border {
+    border: 0;
 }
 .center-text {
     text-align: center;
+}
+.modal-dialog.custom {
+    width: 90%;
+    max-height: calc(100% - 100px);
 }
 
 /* FILEDRAG OVERLAY */
