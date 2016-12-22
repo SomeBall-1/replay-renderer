@@ -33,15 +33,19 @@ $(document).ready(function() {
   paused = false,
   inactive = true;
   
-  let temp = sessionStorage.getItem('settings') || '{}';
-  settings = $.parseJSON(temp);
-  temp = sessionStorage.getItem('texturepack') || '{}';
-  texturePack = $.parseJSON(temp);
-  $('.setting').each(function(i,elem) {
-    elem.checked = settings[elem.value];
-  });
-  if($('#downloadeach').prop('checked')) $('#downloadzip').prop('disabled', false);
-  $('#tname').text('Current Texture Pack: '+texturePack.name);
+  let temp = $.parseJSON(sessionStorage.getItem('settings') || '{}');
+  if(!$.isEmptyObject(temp)) {
+    settings = $.extend({},temp);
+    $('.setting').each(function(i,elem) {
+      elem.checked = settings[elem.value];
+    });
+    if($('#downloadeach').prop('checked')) $('#downloadzip').prop('disabled', false);
+  }
+  temp = $.parseJSON(sessionStorage.getItem('texturepack') || '{}');
+  if(!$.isEmptyObject(temp)) {
+    texturePack = $.extend({},temp);
+    $('#tname').text('Current Texture Pack: '+texturePack.name);
+  }
   /*END VARIABLES*/
   
   
@@ -65,18 +69,23 @@ $(document).ready(function() {
         currentFrame = frame;
         //logger.log(`Rendering frame ${frame} of ${frames}`);
         renderer.draw(frame);
-        if(((frame+1)%(frames/20))<1) { //%every ~5%
-          let frac = (frame+1)/frames*100;
-          $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
-        }
-        
-        return setTimeout(function(frame,frames,fpsDelay) {
-          window.requestAnimationFrame(renderReplay.bind(this,frame,frames,fpsDelay));
-        },fpsDelay,++frame,frames,fpsDelay);
+        recorder.resume();
+        setTimeout(function(frame,frames) {
+          recorder.requestData();
+          recorder.pause();
+          
+          if(((frame+1)%(frames/50))<1) { //%every ~2%
+            let frac = (frame+1)/frames*100;
+            $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
+          }
+          
+          window.requestAnimationFrame(renderReplay.bind(this,++frame,frames,fpsDelay));
+        },fpsDelay,frame,frames);
+      } else {
+        $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
+        recorder.stop();
+        currentFrame = -1;
       }
-      $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
-      recorder.stop();
-      currentFrame = -1;
     }
   }
   
@@ -95,7 +104,8 @@ $(document).ready(function() {
           }
         }
         recorder.onstop = function() {
-          console.log('Finished rendering:',currentIndex,'at:',frame,chunks);
+          console.log('Finished rendering:',currentIndex,'at:',frame,chunks.length);
+          
           window.chunky = chunks;
           let blob = new Blob(chunks, {type: 'video/webm'});
           let url = URL.createObjectURL(blob);
@@ -113,6 +123,7 @@ $(document).ready(function() {
         }
         $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
         recorder.start();
+        recorder.pause();
         
         let replay = toRender[currentIndex],
           me = Object.keys(replay).find(k => replay[k].me == 'me'),
@@ -133,7 +144,7 @@ $(document).ready(function() {
   
   function pauseRendering() {
     if(recorder.state==='recording') {
-      recorder.pause();
+      //recorder.pause();
       $('#render').text('Resume');
       rendering = false;
       paused = true;
@@ -145,7 +156,7 @@ $(document).ready(function() {
       $('#render').text('Pause');
       rendering = true;
       paused = false;
-      recorder.resume();
+      //recorder.resume();
       window.requestAnimationFrame(renderReplay.bind(this,++currentFrame,currentMaxFrames,currentFpsDelay));
     }
   }
@@ -167,6 +178,7 @@ $(document).ready(function() {
       rendering = false;
       inactive = true;
       recorder.stop();
+      $('#game')[0].getContext('2d').clearRect(0,0,1280,800);
       $('#render').addClass('btn-success').removeClass('btn-primary').text('Render');
       $('#stop').addClass('disabled');
     }
@@ -174,7 +186,7 @@ $(document).ready(function() {
   /*END RENDERING STUFF*/
   
   /*HACKY STUFF*/
-  $.ajaxPrefilter( function (options) { //tricky stuff to grab html around cors
+  $.ajaxPrefilter( function (options) { //thing to grab html around cors
     if (options.crossDomain && jQuery.support.cors) {
       var http = (window.location.protocol === 'http:' ? 'http:' : 'https:');
       options.url = http + '//cors-anywhere.herokuapp.com/' + options.url;
@@ -186,16 +198,11 @@ $(document).ready(function() {
   window.require = function(what) {
     if(what==='./textures') {
       return {get: function() {
-        let prom = new Promise(function(resolve,reject) { //idk how to use promises...
-          resolve(true);
-        })
-        return prom.then(function() {
-          let urls = [];
-          for (let name in texturePack) {
-            if(name!=='name') urls.push(texturePack[name]);
-          }
-          return loadImage(urls);
-        }).then(function(images) {
+        let urls = [];
+        for (let name in texturePack) {
+          if(name!=='name') urls.push(texturePack[name]);
+        }
+        return loadImage(urls).then(function(images) {
           let out = {};
           let keys = Object.keys(texturePack);
           let discount = 0;

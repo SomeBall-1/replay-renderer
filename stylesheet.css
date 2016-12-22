@@ -34,9 +34,9 @@ p {
 .progress {
     margin: 10px 15px 20px 15px;
 }
-div.progress-bar {
+/*div.progress-bar {
     transition: none;
-}
+}*/
 label {
     font-weight: normal;
     color: black;
