@@ -84,12 +84,12 @@ $(document).ready(function() {
     if(!$slide.hasClass('complete')) callback(false);
     let filename = $slide.find('p').text();
     filename = filename.substring(0,filename.lastIndexOf('.'))+'.webm';
-    let url = $.data($slide,'webm');
+    let url = $slide.data('webm');
     console.log(url);
     let xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.responseType = 'blob';
-    xhr.onload = function(e) {
+    xhr.onload = function(e) { //get Blob from objecturl
       if(this.status == 200) {
         callback(true,filename,this.response);
       }
@@ -113,7 +113,7 @@ $(document).ready(function() {
             });
           } else {
             writer.close(function(blob) { //blob contains the zip file as a Blob object
-              downloadFile(URL.createObjectURL(blob),'replays_'+completed,'zip');
+              downloadFile(URL.createObjectURL(blob),completed+'_replays','zip');
             });
           }
         }
@@ -201,7 +201,7 @@ $(document).ready(function() {
           let blob = new Blob(chunks, {type: 'video/webm'});
           let url = URL.createObjectURL(blob);
           let $slide = slicker.$slides.eq(currentIndex);
-          $.data($slide,'webm',url);
+          $slide.data('webm',url);
           $slide.addClass('complete');
           
           completed++;
