@@ -14,6 +14,8 @@ $(document).ready(function() {
   tempTexturePack = $.extend({},texturePack),
   settings = {
     webm: false,
+    batch: false,
+    batchVal: 10,
     zip: true,
     spin: false,
     splats: false,
@@ -28,7 +30,9 @@ $(document).ready(function() {
   currentFrame = -1,
   currentMaxFrames = -1,
   currentFpsDelay = -1,
-  currentIndex = -1,
+  currentIndex = 0,
+  batchIndex = 0,
+  completed = 0,
   rendering = false,
   paused = false,
   inactive = true;
@@ -62,6 +66,86 @@ $(document).ready(function() {
   $('#carousel').on('afterChange',updateSlideCounter);
   /*END CAROUSEL STUFF*/
   
+  /*DOWNLOAD STUFF*/
+  zip.workerScriptsPath = 'resources/zip/';
+  function downloadFile(url,filename,extension) {
+    console.log(url);
+    let a = document.createElement('a');
+    document.body.appendChild(a);
+    a.href = url;
+    a.download = filename+'.'+extension;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    a.parentNode.removeChild(a);
+  }
+  
+  function getBlob(index,callback) {
+    let $slide = slicker.$slides.eq(index);
+    if(!$slide.hasClass('complete')) callback(false);
+    let filename = $slide.find('p').text();
+    filename = filename.substring(0,filename.lastIndexOf('.'))+'.webm';
+    let url = $.data($slide,'webm');
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'blob';
+    xhr.onload = function(e) {
+      if(this.status == 200) {
+        callback(true,filename,this.response);
+      }
+    };
+    xhr.send();
+  }
+  
+  function downloadZip(all,zipWriter) {
+    if(all) {
+      zip.createWriter(new zip.BlobWriter(), function(writer) {
+        function nextFile(i) {
+          if(i<slicker.slideCount) {
+            getBlob(i,function(goodfile,filename,blob) {
+              if(goodfile) {
+                writer.add(filename, new zip.BlobReader(blob), function() {
+                  nextFile(++i);
+                });
+              } else {
+                nextFile(++i);
+              }
+            });
+          } else {
+            writer.close(function(blob) { //blob contains the zip file as a Blob object
+              downloadFile(URL.createObjectURL(blob),'replays_'+completed,'zip');
+            });
+          }
+        }
+        nextFile(0);
+      });
+    } else {
+      zip.createWriter(new zip.BlobWriter(), function(writer) {
+        let finished = 0;
+        
+        function nextFile(i) {
+          if(i<slicker.slideCount && finished<settings.batchVal) {
+            getBlob(i,function(goodfile,filename,blob) {
+              if(goodfile) { //has 'complete' class
+                writer.add(filename, new zip.BlobReader(blob), function() {
+                  finished++;
+                  nextFile(++i);
+                });
+              } else {
+                nextFile(++i);
+              }
+            });
+          } else {
+            writer.close(function(blob) { //blob contains the zip file as a Blob object
+              downloadFile(URL.createObjectURL(blob),'replays_'+(batchIndex+1)+'_to_'+(i+1),'zip');
+            });
+          }
+        }
+        nextFile(batchIndex);
+      });
+    }
+  }
+  /*END DOWNLOAD STUFF*/
+  
   /*RENDERING STUFF*/
   function renderReplay(frame=0,frames,fpsDelay) {
     if(!paused && !inactive) {
@@ -71,7 +155,7 @@ $(document).ready(function() {
         renderer.draw(frame);
         recorder.resume();
         setTimeout(function(frame,frames) {
-          recorder.requestData();
+          //recorder.requestData();
           recorder.pause();
           
           if(((frame+1)%(frames/50))<1) { //%every ~2%
@@ -91,10 +175,17 @@ $(document).ready(function() {
   
   function beginRendering(currentIndex) {
     if(currentIndex<toRender.length) {
+      slicker.goTo(currentIndex);
+      slicker.$slides.eq(currentIndex-1).removeClass('current');
+      if($.isEmptyObject(toRender[currentIndex])) { //bad file upload
+        console.log('Bad file, moving on from:',currentIndex);
+        beginRendering(++currentIndex);
+      }
       rendering = true;
       inactive = false;
       chunks = [];
       console.log('Started rendering:',currentIndex);
+      slicker.$slides.eq(currentIndex).addClass('current');
       renderer = new Renderer($('#game')[0],toRender[currentIndex],settings);
       renderer.ready().then((function(toRender,currentIndex){
         recorder = new MediaRecorder($('#game')[0].captureStream(), {mimeType: 'video/webm'});
@@ -105,21 +196,27 @@ $(document).ready(function() {
         }
         recorder.onstop = function() {
           console.log('Finished rendering:',currentIndex,'at:',frame,chunks.length);
-          
           window.chunky = chunks;
           let blob = new Blob(chunks, {type: 'video/webm'});
           let url = URL.createObjectURL(blob);
-          let a = document.createElement('a');
-          document.body.appendChild(a);
-          a.href = url;
-          let filename = slicker.$slides.eq(currentIndex).find('p').text();
-          filename = filename.substring(0,filename.lastIndexOf('.'));
-          a.download = filename+'.webm';
-          a.click();
-          window.URL.revokeObjectURL(url);
-          a.parentNode.removeChild(a);
+          let $slide = slicker.$slides.eq(currentIndex);
+          $.data($slide,'webm',url);
+          $slide.addClass('complete');
           
-          if(!inactive) beginRendering(++currentIndex);
+          completed++;
+          if(settings.webm) {
+            let filename = $slide.find('p').text();
+            filename = filename.substring(0,filename.lastIndexOf('.'));
+            downloadFile(url,filename,'webm');
+          }
+          if(settings.batch && !(completed%settings.batchVal)) {
+            downloadZip();
+            batchIndex = currentIndex+1;
+          }
+          
+          if(!inactive) {
+            beginRendering(++currentIndex);
+          }
         }
         $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
         recorder.start();
@@ -127,13 +224,20 @@ $(document).ready(function() {
         
         let replay = toRender[currentIndex],
           me = Object.keys(replay).find(k => replay[k].me == 'me'),
-          fps = replay[me].fps+1; //+1 because setTimeout seems a little slow
+          fps = replay[me].fps; //+1 because setTimeout seems a little slow
         currentFrame = 0;
         currentMaxFrames = replay.clock.length;
         currentFpsDelay = 1000/fps;
         window.requestAnimationFrame(renderReplay.bind(this,currentFrame,currentMaxFrames,currentFpsDelay));
       }).bind(this,toRender,currentIndex));
     } else {
+      if(settings.batch && completed%settings.batchVal) { //only if last replay wasn't on batch schedule
+        downloadZip();
+        batchIndex = currentIndex;
+      }
+      if(settings.zip) {
+        downloadZip(true);
+      }
       rendering = false;
       inactive = true;
       $('#render').addClass('btn-success').removeClass('btn-primary').text('Render');
@@ -167,7 +271,7 @@ $(document).ready(function() {
     } else if(paused) {
       resumeRendering();
     } else if(inactive) {
-      currentIndex = slicker.currentSlide;
+      //currentIndex = slicker.currentSlide;
       beginRendering(currentIndex);
       $('#render').addClass('btn-primary').removeClass('btn-success').text('Pause');
       $('#stop').removeClass('disabled');
@@ -231,9 +335,9 @@ $(document).ready(function() {
       toRender.push(jsons[i][1]);
       if($.isEmptyObject(jsons[i][1])) flag = ' error';
       else anyGood = true;
-      $('#carousel').slick('slickAdd','<div class="filename-outer">'+
+      $('#carousel').slick('slickAdd','<div class="filename-outer'+flag+'">'+
       '<div class="wrapper">'+
-      '<p class="filename-inner center-text'+flag+'">'+jsons[i][0]+'</p>'+
+      '<p class="filename-inner center-text">'+jsons[i][0]+'</p>'+
       '</div></div>');
     }
     if(anyGood) $('#render').removeClass('disabled');
@@ -305,6 +409,9 @@ $(document).ready(function() {
     $('.setting').each(function(i,elem) {
       settings[elem.value] = elem.checked;
     });
+    $('#batchval').val(~~$('#batchval').val()); //similar to Math.floor --> floats to integers and any text to 0
+    if($('#batchval').val()<0) $('#batchval').val(0); //can manually type negatives and bypass min=0
+    settings.batchVal = $('#batchval').val();
     texturePack = $.extend({},tempTexturePack);
     $('#tname').text('Current Texture Pack: '+texturePack.name);
     sessionStorage.setItem('settings',JSON.stringify(settings));
@@ -315,10 +422,11 @@ $(document).ready(function() {
       $('.setting').each(function(i,elem) {
         elem.checked = settings[elem.value];
       });
+      $('#batchval').val(settings.batchVal);
       $('#tname').text('Current Texture Pack: '+texturePack.name);
       frameWindow.$(".texture-choice").removeClass("active-pack");
       frameWindow.$(".texture-choice[data-name='"+texturePack.name+"']").addClass("active-pack");
-      if(!$('#downloadeach').prop('checked')) $('#downloadzip').prop({'checked': true, 'disabled': true});
+      if(!$('#downloadeach').prop('checked') && !$('#downloadbatch').prop('checked')) $('#downloadzip').prop({'checked': true, 'disabled': true});
     }
     $(this).removeClass('ignore-hide');
   });
@@ -326,10 +434,18 @@ $(document).ready(function() {
   $('#downloadeach').change(function() {
     if($(this).prop('checked')) {
       $('#downloadzip').prop('disabled',false);
-    } else {
+    } else if(!$('#downloadbatch').prop('checked')) {
       $('#downloadzip').prop({'checked': true, 'disabled': true});
     }
   });
+  
+  $('#downloadbatch').change(function() {
+    if($(this).prop('checked')) {
+      $('#downloadzip').prop('disabled',false);
+    } else if(!$('#downloadeach').prop('checked')) {
+      $('#downloadzip').prop({'checked': true, 'disabled': true});
+    }
+  })
   
   $('#texturemodal').on('hide.bs.modal',function() {
     $('#options').modal('show');

@@ -1,18 +1,19 @@
 <head>
   <meta charset="UTF-8">
   <title>TagPro Replay Renderer</title>
-  <script src="resources/jquery.min.js"></script> <!--v3.1.1-->
-  <script src="main.js"></script>
-  <script src="resources/bootstrap.min.js"></script> <!--v3.0.0-->
+  <script type="text/javascript" src="resources/jquery.min.js"></script> <!--v3.1.1-->
+  <script type="text/javascript" src="main.js"></script>
+  <script type="text/javascript" src="resources/bootstrap.min.js"></script> <!--v3.0.0-->
   <link rel="stylesheet" href="resources/bootstrap.min.css">
   <link rel="stylesheet" href="resources/bootstrap-theme.min.css">
   <script src="resources/slick.js"></script> <!--v1.6.0-->
   <link rel="stylesheet" href="resources/slick.css">
   <link rel="stylesheet" href="resources/slick-theme.css">
   <link href="stylesheet.css" rel="stylesheet">
-  <script src="resources/moment.js"></script>
-  <script src="resources/moment-duration-format.js"></script>
-  <script src="resources/image-promise.browser.js"></script>
+  <script type="text/javascript" src="resources/moment.js"></script>
+  <script type="text/javascript" src="resources/moment-duration-format.js"></script>
+  <script type="text/javascript" src="resources/image-promise.browser.js"></script>
+  <script type="text/javascript" src="resources/zip.js"></script>
   <script>
     $(document).ready(function wait() {
       if(!window.require) return setTimeout(wait);
@@ -65,13 +66,18 @@
           <div class="panel panel-default">
             <div class="panel-heading">Download Options</div>
             <div class="panel-body text-center">
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <input type="checkbox" id="downloadeach" value="webm" class="setting">
-                <label for="downloadeach">.webm after each render</label>
+                <label for="downloadeach">.webm after each</label>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-4">
+                <input type="checkbox" id="downloadbatch" value="batch" class="setting">
+                <label for="downloadbatch">.zip every:</label>
+                <input type="number" id="batchval" min="0" value="10" class="number text-center">
+              </div>
+              <div class="col-md-4">
                 <input type="checkbox" id="downloadzip" value="zip" class="setting" checked disabled>
-                <label for="downloadzip">.zip on total completion</label>
+                <label for="downloadzip">.zip after all</label>
               </div>
             </div>
           </div>

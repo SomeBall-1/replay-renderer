@@ -60,6 +60,10 @@ input[type=checkbox][disabled] + label {
     width: 90%;
     max-height: calc(100% - 100px);
 }
+input.number {
+    width: 40px;
+    height: 20px;
+}
 
 /* FILEDRAG OVERLAY */
 #filedrag {
@@ -110,12 +114,14 @@ button.slick-prev::before, button.slick-next::before {
     word-wrap: break-word;
     cursor: pointer;
 }
-p.current {
+.filename-outer.current > div > p {
     color: #337ab7;
 }
-p.error {
+.filename-outer.complete > div > p {
+    color: #5cb85c;
+}
+.filename-outer.error > div > p {
     color: #d9534f;
-    /*color: #5cb85c;*/ /*green done color*/
 }
 /*#fade-left, #fade-right {
     height: 100%;
