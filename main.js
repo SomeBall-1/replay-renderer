@@ -59,7 +59,7 @@ $(document).ready(function() {
     infinite: false,
     slidesToShow: 5
   });
-  let slicker = $('#carousel').slick('getSlick');
+  window.slicker = $('#carousel').slick('getSlick');
   let updateSlideCounter = function(e,slick,current) {
     $('#counter').text((current+1)+' of '+slick.slideCount);
   }
@@ -79,13 +79,14 @@ $(document).ready(function() {
     a.parentNode.removeChild(a);
   }
   
-  function getBlob(index,callback) {
+  window.getBlob = function(index,callback) {
     let $slide = slicker.$slides.eq(index);
     if(!$slide.hasClass('complete')) callback(false);
     let filename = $slide.find('p').text();
     filename = filename.substring(0,filename.lastIndexOf('.'))+'.webm';
     let url = $.data($slide,'webm');
-    var xhr = new XMLHttpRequest();
+    console.log(url);
+    let xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.responseType = 'blob';
     xhr.onload = function(e) {
@@ -175,7 +176,7 @@ $(document).ready(function() {
   
   function beginRendering(currentIndex) {
     if(currentIndex<toRender.length) {
-      slicker.goTo(currentIndex);
+      if(slicker.currentSlide===currentIndex-1) slicker.goTo(currentIndex);
       slicker.$slides.eq(currentIndex-1).removeClass('current');
       if($.isEmptyObject(toRender[currentIndex])) { //bad file upload
         console.log('Bad file, moving on from:',currentIndex);
@@ -226,7 +227,7 @@ $(document).ready(function() {
           me = Object.keys(replay).find(k => replay[k].me == 'me'),
           fps = replay[me].fps; //+1 because setTimeout seems a little slow
         currentFrame = 0;
-        currentMaxFrames = replay.clock.length;
+        currentMaxFrames = 300;//replay.clock.length;
         currentFpsDelay = 1000/fps;
         window.requestAnimationFrame(renderReplay.bind(this,currentFrame,currentMaxFrames,currentFpsDelay));
       }).bind(this,toRender,currentIndex));

@@ -2390,9 +2390,12 @@
             return;
         }
 
-        if (_.slideCount <= Math.ceil(_.options.slidesToShow/2)) {
+        if (index >= _.slideCount) {
             return;
         }
+        /*if (_.slideCount <= Math.ceil(_.options.slidesToShow/2)) {
+            return;
+        }*/
 
         if (sync === false) {
             _.asNavFor(index);
