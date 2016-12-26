@@ -30,6 +30,7 @@ $(document).ready(function() {
   currentFrame = -1,
   currentMaxFrames = -1,
   currentFpsDelay = -1,
+  at,
   currentIndex = 0,
   batchIndex = 0,
   completed = 0,
@@ -154,23 +155,43 @@ $(document).ready(function() {
         //logger.log(`Rendering frame ${frame} of ${frames}`);
         renderer.draw(frame);
         recorder.resume();
-        setTimeout(function(frame,frames) {
-          //recorder.requestData();
-          recorder.pause();
+        at.delay(function(data) {
+          if(recorder.state==='recording') { //hasn't been stopped in the time between
+            //recorder.requestData();
+            recorder.pause();
           
-          if(((frame+1)%(frames/50))<1) { //%every ~2%
-            let frac = (frame+1)/frames*100;
-            $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
+            if(((data.frame+1)%(data.frames/50))<1) { //%every ~2%
+              let frac = (data.frame+1)/data.frames*100;
+              $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
+            }
+          
+            window.requestAnimationFrame(renderReplay.bind(this,++data.frame,data.frames,fpsDelay));
           }
-          
-          window.requestAnimationFrame(renderReplay.bind(this,++frame,frames,fpsDelay));
-        },fpsDelay,frame,frames);
+        },fpsDelay,{frame,frames});
       } else {
         $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
         recorder.stop();
         currentFrame = -1;
       }
     }
+  }
+  
+  function endRendering() {
+    if(settings.batch && completed%settings.batchVal) { //only if last replay wasn't on batch schedule
+      downloadZip(batchIndex,true);
+      batchIndex = currentIndex;
+    }
+    if(settings.zip) {
+      downloadZip(0);
+      completed = 0;
+    } else if($('div.filename-outer.complete').length) {
+      $('#permanentzip').removeClass('disabled');
+    }
+    rendering = false;
+    inactive = true;
+    $('#render').addClass('btn-success').addClass('disabled').removeClass('btn-primary').text('Render');
+    $('#stop').addClass('disabled');
+    console.log('No more replays to render');
   }
   
   function beginRendering() {
@@ -217,6 +238,8 @@ $(document).ready(function() {
           if(!inactive) {
             currentIndex++;
             beginRendering();
+          } else { //pressed stop
+            endRendering();
           }
         }
         $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
@@ -224,34 +247,23 @@ $(document).ready(function() {
         recorder.pause();
         
         let replay = toRender[currentIndex],
-          me = Object.keys(replay).find(k => replay[k].me == 'me'),
-          fps = replay[me].fps; //+1 because setTimeout seems a little slow
+        me = Object.keys(replay).find(k => replay[k].me == 'me'),
+        fps = replay[me].fps; //+1 because setTimeout seems a little slow
         currentFrame = 0;
-        currentMaxFrames = 300;//replay.clock.length;
+        currentMaxFrames = replay.clock.length;
         currentFpsDelay = 1000/fps;
+        at = new AudioTimeout();
         window.requestAnimationFrame(renderReplay.bind(this,currentFrame,currentMaxFrames,currentFpsDelay));
       });
     } else {
-      if(settings.batch && completed%settings.batchVal) { //only if last replay wasn't on batch schedule
-        downloadZip(batchIndex,true);
-        batchIndex = currentIndex;
-      }
-      if(settings.zip) {
-        downloadZip(0);
-        completed = 0;
-      }
-      rendering = false;
-      inactive = true;
-      $('#render').addClass('btn-success').addClass('disabled').removeClass('btn-primary').text('Render');
-      $('#stop').addClass('disabled');
-      console.log('No more replays to render');
+      endRendering();
     }
   }
   
   function pauseRendering() {
     if(recorder.state==='recording') {
       $('#render').text('Resume');
-      $('#permanentzip').removeClass('disabled');
+      if($('div.filename-outer.complete').length) $('#permanentzip').removeClass('disabled');
       rendering = false;
       paused = true;
     }
@@ -286,9 +298,7 @@ $(document).ready(function() {
       inactive = true;
       recorder.stop();
       $('#game')[0].getContext('2d').clearRect(0,0,1280,800);
-      $('#render').addClass('btn-success').removeClass('btn-primary').text('Render');
-      $('#stop').addClass('disabled');
-      $('#permanentzip').removeClass('disabled');
+      $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
     }
   });
   /*END RENDERING STUFF*/
