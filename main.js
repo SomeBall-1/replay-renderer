@@ -6,7 +6,9 @@ $(document).ready(function() {
     portal: 'resources/textures/portal.png',
     speedpad: 'resources/textures/speedpad.png',
     speedpadRed: 'resources/textures/speedpadred.png',
+    speedpadred: 'resources/textures/speedpadred.png',
     speedpadBlue: 'resources/textures/speedpadblue.png',
+    speedpadblue: 'resources/textures/speedpadblue.png',
     splats: 'resources/textures/splats.png',
     gravityWell: 'https://static.koalabeast.com/images/gravitywell.png',//'resources/textures/gravitywell.png',
     flair: 'https://static.koalabeast.com/images/flair.png',//'resources/textures/flair.png'
@@ -30,6 +32,8 @@ $(document).ready(function() {
   currentFrame = -1,
   currentMaxFrames = -1,
   currentFpsDelay = -1,
+  frameStart,
+  frameTimeout,
   at,
   currentIndex = 0,
   batchIndex = 0,
@@ -149,27 +153,30 @@ $(document).ready(function() {
   /*END DOWNLOAD STUFF*/
   
   /*RENDERING STUFF*/
-  function renderReplay(frame=0,frames,fpsDelay) {
+  function nextFrame() {
+    if(recorder.state==='recording') { //hasn't been stopped in the time between
+      //recorder.requestData();
+      recorder.pause();
+      console.log('p',performance.now()-frameStart);
+      if(((currentFrame+1)%(currentMaxFrames/50))<1) { //every ~2% = /50
+        let frac = (currentFrame+1)/currentMaxFrames*100;
+        $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
+      }
+      currentFrame++;
+      window.requestAnimationFrame(renderReplay);
+    }
+  }
+  
+  function renderReplay() {
     if(!paused && !inactive) {
-      if(frame<frames) {
-        currentFrame = frame;
-        //logger.log(`Rendering frame ${frame} of ${frames}`);
-        renderer.draw(frame);
+      if(currentFrame<currentMaxFrames) {
+        console.log('s',performance.now()-frameStart);
+        renderer.draw(currentFrame);
         if(recorder.state!=='paused') return; //can happen if stopped or skipped at this point
+        console.log('e',performance.now()-frameStart);
+        frameStart = performance.now();
         recorder.resume();
-        at.delay(function(data) {
-          if(recorder.state==='recording') { //hasn't been stopped in the time between
-            //recorder.requestData();
-            recorder.pause();
-          
-            if(((data.frame+1)%(data.frames/50))<1) { //%every ~2%
-              let frac = (data.frame+1)/data.frames*100;
-              $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
-            }
-          
-            window.requestAnimationFrame(renderReplay.bind(this,++data.frame,data.frames,fpsDelay));
-          }
-        },fpsDelay,{frame,frames});
+        frameTimeout = setTimeout(nextFrame,currentFpsDelay);
       } else {
         $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
         if(recorder.state!=='inactive') recorder.stop();
@@ -177,6 +184,17 @@ $(document).ready(function() {
       }
     }
   }
+  
+  window.addEventListener('visibilitychange',function(e) {
+    if(document.hidden) {
+      clearTimeout(frameTimeout);
+      let toGo = currentFpsDelay-(e.timeStamp-frameStart)-3; //arbitrary 3 since it has a slight delay
+      console.log('blur');
+      if(toGo>0) {
+        at.delay(nextFrame,toGo);
+      }
+    }
+  });
   
   function skipReplay(permanent) {
     if(permanent) {
@@ -200,6 +218,7 @@ $(document).ready(function() {
     } else if($('div.filename-outer.complete').length) {
       $('#permanentzip').removeClass('disabled');
     }
+    slicker.$slides.eq(currentIndex).removeClass('current');
     rendering = false;
     inactive = true;
     $('#render').addClass('btn-success').addClass('disabled').removeClass('btn-primary').text('Render');
@@ -271,7 +290,7 @@ $(document).ready(function() {
         currentMaxFrames = replay.clock.length;
         currentFpsDelay = 1000/fps;
         at = new AudioTimeout();
-        window.requestAnimationFrame(renderReplay.bind(this,currentFrame,currentMaxFrames,currentFpsDelay));
+        window.requestAnimationFrame(renderReplay);
       });
     } else {
       endRendering();
@@ -293,7 +312,8 @@ $(document).ready(function() {
       $('#permanentzip').addClass('disabled');
       rendering = true;
       paused = false;
-      window.requestAnimationFrame(renderReplay.bind(this,++currentFrame,currentMaxFrames,currentFpsDelay));
+      currentFrame++;
+      window.requestAnimationFrame(renderReplay);
     }
   }
   
@@ -332,7 +352,7 @@ $(document).ready(function() {
   //for tricking the renderer.js into working
   window.module = {};
   window.require = function(what) {
-    if(what==='./textures') {
+    if(what.match(/textures$/)) {
       return {get: function() {
         let urls = [];
         for (let name in texturePack) {
@@ -349,7 +369,7 @@ $(document).ready(function() {
           return out;
         });
       }}
-    } else if(what==='./logger') return (function() {
+    } else if(what.match(/logger$/)) return (function() {
       let logger = $.extend({},console);
       logger.warning = logger.warn = function() {
         skipReplay(true);
@@ -361,10 +381,12 @@ $(document).ready(function() {
       }
       return logger;
     });
-    else if(what==='image-promise') {
+    else if(what.match(/image-promise$/)) {
       return window.loadI;
     }
-    else if(what==='moment') return window.moment;
+    else if(what.match(/moment$/)) {
+      return window.moment;
+    }
   }
   /*END HACKY STUFF*/
   
@@ -517,6 +539,13 @@ $(document).ready(function() {
               else if(tempTexturePack[both[0]]) tempTexturePack[both[0]] = both[1];
             }
             if(tempTexturePack['name']==='custom') tempTexturePack['name'] = 'Custom';
+            if(!tempTexturePack.speedpadred) {
+              tempTexturePack.speedpadred = tempTexturePack.speedpadRed;
+              tempTexturePack.speedpadblue = tempTexturePack.speedpadBlue;
+            } else if(!tempTexturePack.speedpadRed) {
+              tempTexturePack.speedpadRed = tempTexturePack.speedpadred;
+              tempTexturePack.speedpadBlue = tempTexturePack.speedpadblue;
+            }
             $('#texturemodal').modal('hide');
             $('#tname').text('Current Texture Pack: '+tempTexturePack.name);
             frameWindow.$(".texture-choice").removeClass("active-pack");
