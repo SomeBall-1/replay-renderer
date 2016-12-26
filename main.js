@@ -36,7 +36,8 @@ $(document).ready(function() {
   completed = 0,
   rendering = false,
   paused = false,
-  inactive = true;
+  inactive = true,
+  skipping = false;
   
   let temp = $.parseJSON(localStorage.getItem('settings') || '{}');
   if(!$.isEmptyObject(temp)) {
@@ -154,6 +155,7 @@ $(document).ready(function() {
         currentFrame = frame;
         //logger.log(`Rendering frame ${frame} of ${frames}`);
         renderer.draw(frame);
+        if(recorder.state!=='paused') return; //can happen if stopped or skipped at this point
         recorder.resume();
         at.delay(function(data) {
           if(recorder.state==='recording') { //hasn't been stopped in the time between
@@ -170,10 +172,21 @@ $(document).ready(function() {
         },fpsDelay,{frame,frames});
       } else {
         $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
-        recorder.stop();
+        if(recorder.state!=='inactive') recorder.stop();
         currentFrame = -1;
       }
     }
+  }
+  
+  function skipReplay(permanent) {
+    if(permanent) {
+      slicker.$slides.eq(currentIndex).addClass('error');
+      toRender[currentIndex] = {};
+    }
+    rendering = false;
+    inactive = true;
+    skipping = true;
+    if(recorder.state!=='inactive') recorder.stop();
   }
   
   function endRendering() {
@@ -218,27 +231,32 @@ $(document).ready(function() {
           }
         }
         recorder.onstop = function() {
-          console.log('Finished rendering:',currentIndex,'in:',(performance.now()-starttime)/1000);
-          window.chunky = chunks;
-          let blob = new Blob(chunks, {type: 'video/webm'});
-          let url = URL.createObjectURL(blob);
-          let $slide = slicker.$slides.eq(currentIndex);
-          $slide.data('webm',url);
-          $slide.addClass('complete');
-          
-          completed++;
-          if(settings.webm) {
-            downloadFile(url,$slide.data('name'),'webm');
-          }
-          if(settings.batch && !(completed%settings.batchVal)) {
-            downloadZip(batchIndex,true);
-            batchIndex = currentIndex+1;
-          }
-          
           if(!inactive) {
+            console.log('Finished rendering:',currentIndex,'in:',(performance.now()-starttime)/1000);
+            window.chunky = chunks;
+            let blob = new Blob(chunks, {type: 'video/webm'});
+            let url = URL.createObjectURL(blob);
+            let $slide = slicker.$slides.eq(currentIndex);
+            $slide.data('webm',url);
+            $slide.addClass('complete');
+          
+            completed++;
+            if(settings.webm) {
+              downloadFile(url,$slide.data('name'),'webm');
+            }
+            if(settings.batch && !(completed%settings.batchVal)) {
+              downloadZip(batchIndex,true);
+              batchIndex = currentIndex+1;
+            }
+            currentIndex++;
+            beginRendering();
+          } else if(skipping) {
+            console.log('Skipping replay:',currentIndex);
+            skipping = false;
             currentIndex++;
             beginRendering();
           } else { //pressed stop
+            console.log('Stopping rendering at:',currentIndex);
             endRendering();
           }
         }
@@ -285,7 +303,6 @@ $(document).ready(function() {
     } else if(paused) {
       resumeRendering();
     } else if(inactive) {
-      //currentIndex = slicker.currentSlide;
       beginRendering(currentIndex);
       $('#render').addClass('btn-primary').removeClass('btn-success').text('Pause');
       $('#stop').removeClass('disabled');
@@ -296,7 +313,8 @@ $(document).ready(function() {
     if(rendering || paused) {
       rendering = false;
       inactive = true;
-      recorder.stop();
+      if(recorder.state!=='inactive') recorder.stop();
+      else endRendering(); //should never go off
       $('#game')[0].getContext('2d').clearRect(0,0,1280,800);
       $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
     }
@@ -332,7 +350,16 @@ $(document).ready(function() {
         });
       }}
     } else if(what==='./logger') return (function() {
-      return console;
+      let logger = $.extend({},console);
+      logger.warning = logger.warn = function() {
+        skipReplay(true);
+        return console.warn.apply(this,arguments);
+      }
+      logger.error = function() {
+        skipReplay(true);
+        return console.error.apply(this,arguments);
+      }
+      return logger;
     });
     else if(what==='image-promise') {
       return window.loadI;
@@ -387,10 +414,10 @@ $(document).ready(function() {
     e.preventDefault();
     $('#filedrag').css('background-color','rgba(0,0,200,0.75)');
     $('#filedrag b').css('color','white').text('Uploading Replays...');
-    window.files = e.originalEvent.dataTransfer.files;
-    let reader = new FileReader();
-    let jsons = [];
-    let current = 0;
+    let files = e.originalEvent.dataTransfer.files,
+    reader = new FileReader(),
+    jsons = [],
+    current = 0;
     function loadFile(files,i) {
       if(i<files.length) {
         reader.onload = (function(file) {

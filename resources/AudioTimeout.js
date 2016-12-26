@@ -11,7 +11,7 @@ function AudioTimeout() {
   this.delay = function(callback,when,data) {
     let freq = when/1000;
     let osc = this.context.createOscillator();
-    window.oscnode = osc; //without this, it doesn't work sometimes. I'm not joking and I have no idea why. can also be replaced with anything accessing the 'osc' variable (console.log(osc), etc.)
+    this.oscnode = osc; //without this, it doesn't work sometimes. I have no idea why. can also be replaced with anything accessing the 'osc' variable (console.log(osc), window.node = osc, etc.)
     osc.onended = function() {
       callback(data);
     };
