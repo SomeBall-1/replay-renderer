@@ -37,15 +37,16 @@ $(document).ready(function() {
   paused = false,
   inactive = true;
   
-  let temp = $.parseJSON(sessionStorage.getItem('settings') || '{}');
+  let temp = $.parseJSON(localStorage.getItem('settings') || '{}');
   if(!$.isEmptyObject(temp)) {
     settings = $.extend({},temp);
     $('.setting').each(function(i,elem) {
       elem.checked = settings[elem.value];
     });
-    if($('#downloadeach').prop('checked')) $('#downloadzip').prop('disabled', false);
+    $('#batchval').val(settings.batchVal);
+    if($('#downloadeach').prop('checked') || $('#downloadbatch').prop('checked')) $('#downloadzip').prop('disabled', false);
   }
-  temp = $.parseJSON(sessionStorage.getItem('texturepack') || '{}');
+  temp = $.parseJSON(localStorage.getItem('texturepack') || '{}');
   if(!$.isEmptyObject(temp)) {
     texturePack = $.extend({},temp);
     $('#tname').text('Current Texture Pack: '+texturePack.name);
@@ -59,7 +60,7 @@ $(document).ready(function() {
     infinite: false,
     slidesToShow: 5
   });
-  window.slicker = $('#carousel').slick('getSlick');
+  let slicker = $('#carousel').slick('getSlick');
   let updateSlideCounter = function(e,slick,current) {
     $('#counter').text((current+1)+' of '+slick.slideCount);
   }
@@ -68,83 +69,81 @@ $(document).ready(function() {
   
   /*DOWNLOAD STUFF*/
   zip.workerScriptsPath = 'resources/zip/';
-  function downloadFile(url,filename,extension) {
-    console.log(url);
+  function downloadFile(url,filename,extension,revoke) {
     let a = document.createElement('a');
     document.body.appendChild(a);
     a.href = url;
     a.download = filename+'.'+extension;
     a.click();
-    window.URL.revokeObjectURL(url);
+    if(revoke) window.URL.revokeObjectURL(url);
     a.parentNode.removeChild(a);
   }
   
-  window.getBlob = function(index,callback) {
+  function getBlob(index,callback) {
     let $slide = slicker.$slides.eq(index);
-    if(!$slide.hasClass('complete')) callback(false);
-    let filename = $slide.find('p').text();
-    filename = filename.substring(0,filename.lastIndexOf('.'))+'.webm';
+    if(!$slide.hasClass('complete')) return callback(false);
+    let filename = $slide.data('name');
     let url = $slide.data('webm');
-    console.log(url);
     let xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.responseType = 'blob';
     xhr.onload = function(e) { //get Blob from objecturl
       if(this.status == 200) {
-        callback(true,filename,this.response);
+        return callback(true,filename+'.webm',this.response);
       }
     };
     xhr.send();
   }
   
-  function downloadZip(all,zipWriter) {
-    if(all) {
-      zip.createWriter(new zip.BlobWriter(), function(writer) {
-        function nextFile(i) {
-          if(i<slicker.slideCount) {
-            getBlob(i,function(goodfile,filename,blob) {
-              if(goodfile) {
-                writer.add(filename, new zip.BlobReader(blob), function() {
-                  nextFile(++i);
-                });
-              } else {
+  function downloadZip(startIndex,partial,reenable) {
+    let finished = 0;
+    zip.createWriter(new zip.BlobWriter(), function(writer) {
+      function nextFile(i) {
+        if(i<slicker.slideCount && (!partial || finished<settings.batchVal)) {
+          getBlob(i,function(goodfile,filename,blob) {
+            if(goodfile) {
+              writer.add(filename, new zip.BlobReader(blob), function() {
+                finished++;
                 nextFile(++i);
-              }
-            });
-          } else {
-            writer.close(function(blob) { //blob contains the zip file as a Blob object
-              downloadFile(URL.createObjectURL(blob),completed+'_replays','zip');
-            });
-          }
+              },function(current,max) {
+                //percent of file complete = current/max
+              });
+            } else {
+              nextFile(++i);
+            }
+          });
+        } else {
+          writer.close(function(blob) { //blob contains the zip file as a Blob object
+            if(reenable) $('#render').removeClass('disabled');
+            if(partial) {
+              downloadFile(URL.createObjectURL(blob),'replays_'+(startIndex+1)+'_to_'+i,'zip',true);
+            } else if(finished>0) {
+              let url = URL.createObjectURL(blob);
+              $('#permanentzip').data('zip',url);
+              let name = finished+'_replays';
+              $('#permanentzip').data('name',name);
+              $('#permanentzip').removeClass('disabled');
+              downloadFile(url,name,'zip');
+            }
+          });
         }
-        nextFile(0);
-      });
-    } else {
-      zip.createWriter(new zip.BlobWriter(), function(writer) {
-        let finished = 0;
-        
-        function nextFile(i) {
-          if(i<slicker.slideCount && finished<settings.batchVal) {
-            getBlob(i,function(goodfile,filename,blob) {
-              if(goodfile) { //has 'complete' class
-                writer.add(filename, new zip.BlobReader(blob), function() {
-                  finished++;
-                  nextFile(++i);
-                });
-              } else {
-                nextFile(++i);
-              }
-            });
-          } else {
-            writer.close(function(blob) { //blob contains the zip file as a Blob object
-              downloadFile(URL.createObjectURL(blob),'replays_'+(batchIndex+1)+'_to_'+(i+1),'zip');
-            });
-          }
-        }
-        nextFile(batchIndex);
-      });
-    }
+      }
+      nextFile(startIndex);
+    });
   }
+  
+  $('div.slick-track').on('click','.complete',function() {
+    downloadFile($(this).data('webm'),$(this).data('name'),'webm');
+  });
+
+  $('#permanentzip').click(function() {
+    if(!$(this).data('zip')) {
+      downloadZip(0,false,!$('#render').hasClass('disabled')); //revoke url and clear
+      $('#render').addClass('disabled');
+    } else {
+      downloadFile($(this).data('zip'),$(this).data('name'),'zip');
+    }
+  });
   /*END DOWNLOAD STUFF*/
   
   /*RENDERING STUFF*/
@@ -174,21 +173,23 @@ $(document).ready(function() {
     }
   }
   
-  function beginRendering(currentIndex) {
+  function beginRendering() {
     if(currentIndex<toRender.length) {
       if(slicker.currentSlide===currentIndex-1) slicker.goTo(currentIndex);
       slicker.$slides.eq(currentIndex-1).removeClass('current');
       if($.isEmptyObject(toRender[currentIndex])) { //bad file upload
         console.log('Bad file, moving on from:',currentIndex);
-        beginRendering(++currentIndex);
+        currentIndex++;
+        beginRendering();
       }
       rendering = true;
       inactive = false;
       chunks = [];
+      let starttime = performance.now();
       console.log('Started rendering:',currentIndex);
       slicker.$slides.eq(currentIndex).addClass('current');
       renderer = new Renderer($('#game')[0],toRender[currentIndex],settings);
-      renderer.ready().then((function(toRender,currentIndex){
+      renderer.ready().then(function(){
         recorder = new MediaRecorder($('#game')[0].captureStream(), {mimeType: 'video/webm'});
         recorder.ondataavailable = function(event) {
           if(event.data && event.data.size > 0) {
@@ -196,7 +197,7 @@ $(document).ready(function() {
           }
         }
         recorder.onstop = function() {
-          console.log('Finished rendering:',currentIndex,'at:',frame,chunks.length);
+          console.log('Finished rendering:',currentIndex,'in:',(performance.now()-starttime)/1000);
           window.chunky = chunks;
           let blob = new Blob(chunks, {type: 'video/webm'});
           let url = URL.createObjectURL(blob);
@@ -206,17 +207,16 @@ $(document).ready(function() {
           
           completed++;
           if(settings.webm) {
-            let filename = $slide.find('p').text();
-            filename = filename.substring(0,filename.lastIndexOf('.'));
-            downloadFile(url,filename,'webm');
+            downloadFile(url,$slide.data('name'),'webm');
           }
           if(settings.batch && !(completed%settings.batchVal)) {
-            downloadZip();
+            downloadZip(batchIndex,true);
             batchIndex = currentIndex+1;
           }
           
           if(!inactive) {
-            beginRendering(++currentIndex);
+            currentIndex++;
+            beginRendering();
           }
         }
         $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
@@ -230,18 +230,19 @@ $(document).ready(function() {
         currentMaxFrames = 300;//replay.clock.length;
         currentFpsDelay = 1000/fps;
         window.requestAnimationFrame(renderReplay.bind(this,currentFrame,currentMaxFrames,currentFpsDelay));
-      }).bind(this,toRender,currentIndex));
+      });
     } else {
       if(settings.batch && completed%settings.batchVal) { //only if last replay wasn't on batch schedule
-        downloadZip();
+        downloadZip(batchIndex,true);
         batchIndex = currentIndex;
       }
       if(settings.zip) {
-        downloadZip(true);
+        downloadZip(0);
+        completed = 0;
       }
       rendering = false;
       inactive = true;
-      $('#render').addClass('btn-success').removeClass('btn-primary').text('Render');
+      $('#render').addClass('btn-success').addClass('disabled').removeClass('btn-primary').text('Render');
       $('#stop').addClass('disabled');
       console.log('No more replays to render');
     }
@@ -249,8 +250,8 @@ $(document).ready(function() {
   
   function pauseRendering() {
     if(recorder.state==='recording') {
-      //recorder.pause();
       $('#render').text('Resume');
+      $('#permanentzip').removeClass('disabled');
       rendering = false;
       paused = true;
     }
@@ -259,9 +260,9 @@ $(document).ready(function() {
   function resumeRendering() {
     if(recorder.state==='paused') {
       $('#render').text('Pause');
+      $('#permanentzip').addClass('disabled');
       rendering = true;
       paused = false;
-      //recorder.resume();
       window.requestAnimationFrame(renderReplay.bind(this,++currentFrame,currentMaxFrames,currentFpsDelay));
     }
   }
@@ -276,6 +277,7 @@ $(document).ready(function() {
       beginRendering(currentIndex);
       $('#render').addClass('btn-primary').removeClass('btn-success').text('Pause');
       $('#stop').removeClass('disabled');
+      $('#permanentzip').addClass('disabled').removeData('zip').removeData('name');
     }
   });
   $('#stop').click(function(e) {
@@ -286,6 +288,7 @@ $(document).ready(function() {
       $('#game')[0].getContext('2d').clearRect(0,0,1280,800);
       $('#render').addClass('btn-success').removeClass('btn-primary').text('Render');
       $('#stop').addClass('disabled');
+      $('#permanentzip').removeClass('disabled');
     }
   });
   /*END RENDERING STUFF*/
@@ -336,10 +339,13 @@ $(document).ready(function() {
       toRender.push(jsons[i][1]);
       if($.isEmptyObject(jsons[i][1])) flag = ' error';
       else anyGood = true;
-      $('#carousel').slick('slickAdd','<div class="filename-outer'+flag+'">'+
+      let $slide = $('<div class="filename-outer'+flag+'">'+
       '<div class="wrapper">'+
       '<p class="filename-inner center-text">'+jsons[i][0]+'</p>'+
       '</div></div>');
+      let filename = jsons[i][0].replace(/\.(txt|json)$/,'');
+      $slide.data('name',filename);
+      $('#carousel').slick('slickAdd',$slide[0]);
     }
     if(anyGood) $('#render').removeClass('disabled');
     updateSlideCounter(false,slicker,slicker.currentSlide);
@@ -415,9 +421,10 @@ $(document).ready(function() {
     settings.batchVal = $('#batchval').val();
     texturePack = $.extend({},tempTexturePack);
     $('#tname').text('Current Texture Pack: '+texturePack.name);
-    sessionStorage.setItem('settings',JSON.stringify(settings));
-    sessionStorage.setItem('texturepack',JSON.stringify(texturePack));
+    localStorage.setItem('settings',JSON.stringify(settings));
+    localStorage.setItem('texturepack',JSON.stringify(texturePack));
   });
+  
   $('#options').on('hidden.bs.modal',function() {
     if(!$(this).hasClass('ignore-hide')) {
       $('.setting').each(function(i,elem) {
@@ -430,6 +437,8 @@ $(document).ready(function() {
       if(!$('#downloadeach').prop('checked') && !$('#downloadbatch').prop('checked')) $('#downloadzip').prop({'checked': true, 'disabled': true});
     }
     $(this).removeClass('ignore-hide');
+  }).keypress(function(e) {
+    if(e.keyCode===13) $('#save').click();
   });
   
   $('#downloadeach').change(function() {

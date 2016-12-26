@@ -34,9 +34,9 @@ p {
 .progress {
     margin: 10px 15px 20px 15px;
 }
-/*div.progress-bar {
+div.progress-bar {
     transition: none;
-}*/
+}
 label {
     font-weight: normal;
     color: black;
@@ -106,19 +106,22 @@ button.slick-prev::before, button.slick-next::before {
 .filename-outer {
     margin: 0 20px;
 }
+.filename-outer:focus {
+    outline: none;
+}
 .filename-inner {
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical; 
     word-wrap: break-word;
-    cursor: pointer;
 }
 .filename-outer.current > div > p {
     color: #337ab7;
 }
 .filename-outer.complete > div > p {
     color: #5cb85c;
+    cursor: pointer;
 }
 .filename-outer.error > div > p {
     color: #d9534f;

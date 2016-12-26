@@ -787,10 +787,17 @@
 					name = name.trim();
 					if (options.directory && name.charAt(name.length - 1) != "/")
 						name += "/";
-					if (files.hasOwnProperty(name)) {
-						onerror(ERR_DUPLICATED_NAME);
-						return;
+          
+          let temp = name;
+          let ext = name.match(/\.(.+)$/)[0];
+          let count = 1;
+					while (files.hasOwnProperty(temp)) {
+            temp = name.replace(new RegExp(ext+'$'),'_'+(count++)+ext);
+						/*onerror(ERR_DUPLICATED_NAME);
+						return;*/
 					}
+          name = temp;
+          
 					filename = getBytes(encodeUTF8(name));
 					filenames.push(name);
 					writeHeader(function() {
