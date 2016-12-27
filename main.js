@@ -27,21 +27,58 @@ $(document).ready(function() {
   frameWindow = document.getElementById('textureframe').contentWindow,
   toRender = [],
   renderer,
-  recorder = {},
   chunks = [],
   currentFrame = -1,
   currentMaxFrames = -1,
   currentFpsDelay = -1,
+  renderStart,
   frameStart,
   frameTimeout,
-  at,
+  at = new AudioTimeout(),
   currentIndex = 0,
   batchIndex = 0,
   completed = 0,
   rendering = false,
   paused = false,
   inactive = true,
-  skipping = false;
+  skipping = false,
+  visible = true,
+  recorder = new MediaRecorder($('#game')[0].captureStream(), {mimeType: 'video/webm'});
+  recorder.ondataavailable = function(event) {
+    if(event.data && event.data.size > 0) {
+      chunks.push(event.data);
+    }
+  }
+  recorder.onstop = function() {
+    if(!inactive) {
+      console.log('Finished rendering:',currentIndex,'in:',(performance.now()-renderStart)/1000);
+      //window.chunky = chunks;
+      let blob = new Blob(chunks, {type: 'video/webm'});
+      let url = URL.createObjectURL(blob);
+      let $slide = slicker.$slides.eq(currentIndex);
+      $slide.data('webm',url);
+      $slide.addClass('complete');
+    
+      completed++;
+      if(settings.webm) {
+        downloadFile(url,$slide.data('name'),'webm');
+      }
+      if(settings.batch && !(completed%settings.batchVal)) {
+        downloadZip(batchIndex,true);
+        batchIndex = currentIndex+1;
+      }
+      currentIndex++;
+      beginRendering();
+    } else if(skipping) {
+      console.log('Skipping replay:',currentIndex);
+      skipping = false;
+      currentIndex++;
+      beginRendering();
+    } else { //pressed stop
+      console.log('Stopping rendering at:',currentIndex);
+      endRendering(true);
+    }
+  }
   
   let temp = $.parseJSON(localStorage.getItem('settings') || '{}');
   if(!$.isEmptyObject(temp)) {
@@ -102,7 +139,10 @@ $(document).ready(function() {
   }
   
   function downloadZip(startIndex,partial,reenable) {
-    let finished = 0;
+    $('body').append('<div class="alert alert-info text-center navbar-fixed-top"><strong>Creating .zip file of'+(partial?' a few ':' all the ')+'replays...</strong></div>');
+    $('#permanentzip').addClass('disabled');
+    let finished = 0,
+    last = startIndex;
     zip.createWriter(new zip.BlobWriter(), function(writer) {
       function nextFile(i) {
         if(i<slicker.slideCount && (!partial || finished<settings.batchVal)) {
@@ -110,6 +150,7 @@ $(document).ready(function() {
             if(goodfile) {
               writer.add(filename, new zip.BlobReader(blob), function() {
                 finished++;
+                last = i;
                 nextFile(++i);
               },function(current,max) {
                 //percent of file complete = current/max
@@ -121,8 +162,9 @@ $(document).ready(function() {
         } else {
           writer.close(function(blob) { //blob contains the zip file as a Blob object
             if(reenable) $('#render').removeClass('disabled');
-            if(partial) {
-              downloadFile(URL.createObjectURL(blob),'replays_'+(startIndex+1)+'_to_'+i,'zip',true);
+            $('.alert').eq(0).remove();
+            if(partial && finished>0) {
+              downloadFile(URL.createObjectURL(blob),'replays_'+(startIndex+1)+'_to_'+(last+1),'zip',true);
             } else if(finished>0) {
               let url = URL.createObjectURL(blob);
               $('#permanentzip').data('zip',url);
@@ -144,7 +186,7 @@ $(document).ready(function() {
 
   $('#permanentzip').click(function() {
     if(!$(this).data('zip')) {
-      downloadZip(0,false,!$('#render').hasClass('disabled')); //revoke url and clear
+      downloadZip(0,false,!$('#render').hasClass('disabled'));
       $('#render').addClass('disabled');
     } else {
       downloadFile($(this).data('zip'),$(this).data('name'),'zip');
@@ -157,41 +199,41 @@ $(document).ready(function() {
     if(recorder.state==='recording') { //hasn't been stopped in the time between
       //recorder.requestData();
       recorder.pause();
-      console.log('p',performance.now()-frameStart);
       if(((currentFrame+1)%(currentMaxFrames/50))<1) { //every ~2% = /50
         let frac = (currentFrame+1)/currentMaxFrames*100;
         $('.progress-bar').css('width', frac+'%').attr('aria-valuenow', frac);
       }
       currentFrame++;
-      window.requestAnimationFrame(renderReplay);
+      if(visible) renderReplay();
     }
   }
   
   function renderReplay() {
     if(!paused && !inactive) {
       if(currentFrame<currentMaxFrames) {
-        console.log('s',performance.now()-frameStart);
         renderer.draw(currentFrame);
         if(recorder.state!=='paused') return; //can happen if stopped or skipped at this point
-        console.log('e',performance.now()-frameStart);
         frameStart = performance.now();
         recorder.resume();
         frameTimeout = setTimeout(nextFrame,currentFpsDelay);
       } else {
         $('.progress-bar').css('width', '100%').attr('aria-valuenow', 100);
         if(recorder.state!=='inactive') recorder.stop();
-        currentFrame = -1;
       }
     }
   }
   
   window.addEventListener('visibilitychange',function(e) {
-    if(document.hidden) {
-      clearTimeout(frameTimeout);
-      let toGo = currentFpsDelay-(e.timeStamp-frameStart)-3; //arbitrary 3 since it has a slight delay
-      console.log('blur');
-      if(toGo>0) {
+    if(rendering) {
+      if(document.hidden) {
+        clearTimeout(frameTimeout);
+        visible = false;
+        let toGo = currentFpsDelay-(e.timeStamp-frameStart)-3; //semi-random 3 since it has a slight delay
+        if(toGo<0 || isNaN(toGo)) toGo = 0;
         at.delay(nextFrame,toGo);
+      } else {
+        visible = true;
+        if(rendering) renderReplay();
       }
     }
   });
@@ -207,16 +249,20 @@ $(document).ready(function() {
     if(recorder.state!=='inactive') recorder.stop();
   }
   
-  function endRendering() {
-    if(settings.batch && completed%settings.batchVal) { //only if last replay wasn't on batch schedule
-      downloadZip(batchIndex,true);
-      batchIndex = currentIndex;
-    }
-    if(settings.zip) {
-      downloadZip(0);
-      completed = 0;
-    } else if($('div.filename-outer.complete').length) {
-      $('#permanentzip').removeClass('disabled');
+  function endRendering(manual) {
+    if(!manual) {
+      if(settings.zip) {
+        downloadZip(0);
+        completed = 0;
+      } else {
+        if(settings.batch && completed%settings.batchVal) { //only if last replay wasn't on batch schedule
+          downloadZip(batchIndex,true);
+          batchIndex = currentIndex;
+        }
+        if($('div.filename-outer.complete').length) {
+          $('#permanentzip').removeClass('disabled');
+        }
+      }
     }
     slicker.$slides.eq(currentIndex).removeClass('current');
     rendering = false;
@@ -238,59 +284,22 @@ $(document).ready(function() {
       rendering = true;
       inactive = false;
       chunks = [];
-      let starttime = performance.now();
+      renderStart = performance.now();
       console.log('Started rendering:',currentIndex);
       slicker.$slides.eq(currentIndex).addClass('current');
       renderer = new Renderer($('#game')[0],toRender[currentIndex],settings);
       renderer.ready().then(function(){
-        recorder = new MediaRecorder($('#game')[0].captureStream(), {mimeType: 'video/webm'});
-        recorder.ondataavailable = function(event) {
-          if(event.data && event.data.size > 0) {
-            chunks.push(event.data);
-          }
-        }
-        recorder.onstop = function() {
-          if(!inactive) {
-            console.log('Finished rendering:',currentIndex,'in:',(performance.now()-starttime)/1000);
-            window.chunky = chunks;
-            let blob = new Blob(chunks, {type: 'video/webm'});
-            let url = URL.createObjectURL(blob);
-            let $slide = slicker.$slides.eq(currentIndex);
-            $slide.data('webm',url);
-            $slide.addClass('complete');
-          
-            completed++;
-            if(settings.webm) {
-              downloadFile(url,$slide.data('name'),'webm');
-            }
-            if(settings.batch && !(completed%settings.batchVal)) {
-              downloadZip(batchIndex,true);
-              batchIndex = currentIndex+1;
-            }
-            currentIndex++;
-            beginRendering();
-          } else if(skipping) {
-            console.log('Skipping replay:',currentIndex);
-            skipping = false;
-            currentIndex++;
-            beginRendering();
-          } else { //pressed stop
-            console.log('Stopping rendering at:',currentIndex);
-            endRendering();
-          }
-        }
         $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
         recorder.start();
         recorder.pause();
         
         let replay = toRender[currentIndex],
         me = Object.keys(replay).find(k => replay[k].me == 'me'),
-        fps = replay[me].fps; //+1 because setTimeout seems a little slow
+        fps = replay[me].fps;
         currentFrame = 0;
         currentMaxFrames = replay.clock.length;
         currentFpsDelay = 1000/fps;
-        at = new AudioTimeout();
-        window.requestAnimationFrame(renderReplay);
+        if(visible) renderReplay();
       });
     } else {
       endRendering();
@@ -313,7 +322,7 @@ $(document).ready(function() {
       rendering = true;
       paused = false;
       currentFrame++;
-      window.requestAnimationFrame(renderReplay);
+      if(visible) renderReplay();
     }
   }
   
@@ -334,7 +343,7 @@ $(document).ready(function() {
       rendering = false;
       inactive = true;
       if(recorder.state!=='inactive') recorder.stop();
-      else endRendering(); //should never go off
+      else endRendering(true); //should never go off
       $('#game')[0].getContext('2d').clearRect(0,0,1280,800);
       $('.progress-bar').css('width', '0%').attr('aria-valuenow', 0);
     }
@@ -436,28 +445,61 @@ $(document).ready(function() {
     e.preventDefault();
     $('#filedrag').css('background-color','rgba(0,0,200,0.75)');
     $('#filedrag b').css('color','white').text('Uploading Replays...');
-    let files = e.originalEvent.dataTransfer.files,
+    let eventItems = e.originalEvent.dataTransfer.items,
+    items = [],
     reader = new FileReader(),
     jsons = [],
     current = 0;
-    function loadFile(files,i) {
-      if(i<files.length) {
-        reader.onload = (function(file) {
-          return function(e) {
-            let json = {};
-            try {
-              json = $.parseJSON(e.target.result || '{}');
-            } catch(e) {
+    for(let i = 0;i < eventItems.length;i++) {
+      items.push(eventItems[i].webkitGetAsEntry());
+    }
+    //adapted from: http://stackoverflow.com/a/11410455
+    function traverseFileTree(item, path, callback, i) {
+      path = path || "";
+      if(item.isFile) {
+        //Get file
+        item.file(function(file) {
+          reader.onload = (function(file) {
+            return function(e) {
+              let json = {};
+              try {
+                json = $.parseJSON(e.target.result || '{}');
+              } catch(e) {
+              }
+              jsons.push([file.name,json]);
+              callback(i);
             }
-            jsons.push([file.name,json]);
-            loadFile(files,++i);
+          })(file);
+          try {
+            if(file.type!=='text/plain') {
+              throw Error();
+            }
+            reader.readAsText(file);
+          } catch(e) {
+            jsons.push([file.name,{}]);
+            callback(i);
           }
-        })(files[i]);
-        try {
-          reader.readAsText(files[i]);
-        } catch(e) {
-          jsons.push([files[i].name,{}]);
-          loadFile(files,++i);
+        });
+      } else if(item.isDirectory) {
+        //Get folder contents
+        let dirReader = item.createReader();
+        dirReader.readEntries(function loadDir(entries) {
+          function insideLoadItems(index) {
+            if(index<entries.length) {
+              traverseFileTree(entries[index], path + item.name + "/", insideLoadItems, ++index);
+            } else {
+              callback(i);
+            }
+          }
+          insideLoadItems(0);
+        });
+      }
+    }
+    function loadItems(index) {
+      if(index<items.length) {
+        let item = items[index]
+        if(item) {
+          traverseFileTree(item, '', loadItems, ++index);
         }
       } else {
         $('#filedrag').hide().css('background-color','rgba(100,100,100,0.75)');
@@ -465,7 +507,7 @@ $(document).ready(function() {
         dropComplete(jsons);
       }
     }
-    loadFile(files,0)
+    loadItems(0);
   });
   /*END FILEHANDLING STUFF*/
   
@@ -539,13 +581,8 @@ $(document).ready(function() {
               else if(tempTexturePack[both[0]]) tempTexturePack[both[0]] = both[1];
             }
             if(tempTexturePack['name']==='custom') tempTexturePack['name'] = 'Custom';
-            if(!tempTexturePack.speedpadred) {
-              tempTexturePack.speedpadred = tempTexturePack.speedpadRed;
-              tempTexturePack.speedpadblue = tempTexturePack.speedpadBlue;
-            } else if(!tempTexturePack.speedpadRed) {
-              tempTexturePack.speedpadRed = tempTexturePack.speedpadred;
-              tempTexturePack.speedpadBlue = tempTexturePack.speedpadblue;
-            }
+            tempTexturePack.speedpadred = tempTexturePack.speedpadRed;
+            tempTexturePack.speedpadblue = tempTexturePack.speedpadBlue;
             $('#texturemodal').modal('hide');
             $('#tname').text('Current Texture Pack: '+tempTexturePack.name);
             frameWindow.$(".texture-choice").removeClass("active-pack");

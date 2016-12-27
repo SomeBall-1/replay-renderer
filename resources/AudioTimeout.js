@@ -17,6 +17,6 @@ function AudioTimeout() {
     };
     osc.connect(silence);
     osc.start();
-    osc.stop(this.context.currentTime + freq);
+    osc.stop(this.context.currentTime+freq);
   }
 }
