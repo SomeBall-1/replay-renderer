@@ -10,8 +10,8 @@ $(document).ready(function() {
     speedpadBlue: 'resources/textures/speedpadblue.png',
     speedpadblue: 'resources/textures/speedpadblue.png',
     splats: 'resources/textures/splats.png',
-    gravityWell: 'https://static.koalabeast.com/images/gravitywell.png',//'resources/textures/gravitywell.png',
-    flair: 'https://static.koalabeast.com/images/flair.png',//'resources/textures/flair.png'
+    gravityWell: 'resources/textures/gravitywell.png',
+    flair: 'https://static.koalabeast.com/images/flair.png'
   },
   tempTexturePack = $.extend({},texturePack),
   settings = {
@@ -35,6 +35,7 @@ $(document).ready(function() {
   frameStart,
   frameTimeout,
   at = new AudioTimeout(),
+  //zipper = new JSZip(),
   currentIndex = 0,
   batchIndex = 0,
   completed = 0,
@@ -96,7 +97,6 @@ $(document).ready(function() {
   }
   /*END VARIABLES*/
   
-  
   /*CAROUSEL STUFF */
   $('#carousel').slick({
     centerMode: true,
@@ -112,7 +112,7 @@ $(document).ready(function() {
   
   /*DOWNLOAD STUFF*/
   zip.workerScriptsPath = 'resources/zip/';
-  function downloadFile(url,filename,extension,revoke) {
+  window.downloadFile = function(url,filename,extension,revoke) {
     let a = document.createElement('a');
     document.body.appendChild(a);
     a.href = url;
@@ -122,7 +122,7 @@ $(document).ready(function() {
     a.parentNode.removeChild(a);
   }
   
-  function getBlob(index,callback) {
+  window.getBlob = function(index,callback) {
     let $slide = slicker.$slides.eq(index);
     if(!$slide.hasClass('complete')) return callback(false);
     let filename = $slide.data('name');
@@ -138,21 +138,33 @@ $(document).ready(function() {
     xhr.send();
   }
   
-  function downloadZip(startIndex,partial,reenable) {
-    $('body').append('<div class="alert alert-info text-center navbar-fixed-top"><strong>Creating .zip file of'+(partial?' a few ':' all the ')+'replays...</strong></div>');
+  window.addToZip = function(filename,blob,callback) {
+    let reader = new FileReader();
+    reader.onload = function() {
+      zipper.file(filename,reader.response);
+      callback();
+    }
+    reader.readAsArrayBuffer(blob);
+  }
+  
+  window.downloadZip = function(startIndex,partial,reenable) {
+    $('body').append('<div class="alert alert-info text-center navbar-fixed-top"><strong>Creating .zip file of'+(partial?' a few ':' all ')+'replays...</strong></div>');
     $('#permanentzip').addClass('disabled');
     let finished = 0,
     last = startIndex;
-    zip.createWriter(new zip.BlobWriter(), function(writer) {
+    zip.createWriter(new zip.BlobWriter('application/zip'), function(writer) {
       function nextFile(i) {
         if(i<slicker.slideCount && (!partial || finished<settings.batchVal)) {
+          console.log('starting:',i);
           getBlob(i,function(goodfile,filename,blob) {
             if(goodfile) {
               writer.add(filename, new zip.BlobReader(blob), function() {
+                console.log('did:',i);
                 finished++;
                 last = i;
                 nextFile(++i);
               },function(current,max) {
+                //console.log(current/max);
                 //percent of file complete = current/max
               });
             } else {
@@ -161,6 +173,7 @@ $(document).ready(function() {
           });
         } else {
           writer.close(function(blob) { //blob contains the zip file as a Blob object
+            window.zipped = blob;
             if(reenable) $('#render').removeClass('disabled');
             $('.alert').eq(0).remove();
             if(partial && finished>0) {
@@ -168,10 +181,40 @@ $(document).ready(function() {
             } else if(finished>0) {
               let url = URL.createObjectURL(blob);
               $('#permanentzip').data('zip',url);
-              let name = finished+'_replays';
+              let name = finished+(finished>1?'_replays':'_replay');
               $('#permanentzip').data('name',name);
               $('#permanentzip').removeClass('disabled');
               downloadFile(url,name,'zip');
+              console.log('creating other zip')
+              let zipper = new JSZip();
+              function addFile(ind) {
+                if(ind<slicker.slideCount) {
+                  getBlob(ind,function(goodfile,filename,blob) {
+                    if(goodfile) {
+                      let reader = new FileReader();
+                      reader.onloadend = function() {
+                        console.log('added:',ind);
+                        zipper.file(filename, reader.result);
+                        addFile(++ind);
+                      }
+                      reader.readAsArrayBuffer(blob)
+                    }
+                  });
+                } else {
+                  let writeStream = streamSaver.createWriteStream('output.zip').getWriter();
+                  zipper.generateInternalStream({type: 'uint8array', streamFiles: true})
+                  .on('data', function(data) {
+                    writeStream.write(data);
+                  }).on('error', function(err) {
+                    console.log(err);
+                    writeStream.error(err);
+                  }).on('end', function() {
+                    console.log('end');
+                    writeStream.close();
+                  }).resume();
+                }
+              }
+              addFile(0);
             }
           });
         }
@@ -211,6 +254,9 @@ $(document).ready(function() {
   function renderReplay() {
     if(!paused && !inactive) {
       if(currentFrame<currentMaxFrames) {
+        if(performance.now()-frameStart > 20) {
+          console.log(performance.now()-frameStart);
+        }
         renderer.draw(currentFrame);
         if(recorder.state!=='paused') return; //can happen if stopped or skipped at this point
         frameStart = performance.now();
