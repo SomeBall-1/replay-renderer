@@ -10,11 +10,11 @@
 	to open up a link that will start the download
 -->
 <script>
-//let host = "jimmywarting.github.io"
+let host = "jimmywarting.github.io"
 
 // Service worker only works on https, 127.0.0.1 and localhost
 // So we just redirect asap
-if (window.location.protocol != "https:")
+if (window.location.host == host && window.location.protocol != "https:")
     window.location.protocol = "https:"
 
 // message event is the first thing we need to setup a listner for

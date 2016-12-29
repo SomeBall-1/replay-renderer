@@ -14,10 +14,12 @@
   <script type="text/javascript" src="resources/moment.js"></script>
   <script type="text/javascript" src="resources/moment-duration-format.js"></script>
   <script type="text/javascript" src="resources/image-promise.browser.js"></script>
-  <script type="text/javascript" src="resources/zip.js"></script>
-  <script type="text/javascript" src="resources/jszip.min.js"></script>
+  <script type="text/javascript" src="resources/stream-browserify.js"></script>
+  <script type="text/javascript" src="resources/buffer.js"></script>
+  <script>window.Buffer = buffer.Buffer</script>
   <script type="text/javascript" src="resources/StreamSaver.js"></script>
   <script type="text/javascript" src="resources/polyfill.min.js"></script>
+  <script type="text/javascript" src="resources/jszip.js"></script>
   <script>
     $(document).ready(function wait() {
       if(!window.require) return setTimeout(wait);
@@ -71,17 +73,12 @@
           <div class="panel panel-default">
             <div class="panel-heading">Download Options</div>
             <div class="panel-body text-center">
-              <div class="col-md-4">
-                <input type="checkbox" id="downloadeach" value="webm" class="setting">
+              <div class="col-md-6">
+                <input type="checkbox" id="downloadeach" value="webm" class="setting" checked>
                 <label for="downloadeach">.webm after each</label>
               </div>
-              <div class="col-md-4">
-                <input type="checkbox" id="downloadbatch" value="batch" class="setting">
-                <label for="downloadbatch">.zip every:</label>
-                <input type="number" id="batchval" min="0" value="10" class="number text-center">
-              </div>
-              <div class="col-md-4">
-                <input type="checkbox" id="downloadzip" value="zip" class="setting" checked disabled>
+              <div class="col-md-6">
+                <input type="checkbox" id="downloadzip" value="zip" class="setting">
                 <label for="downloadzip">.zip after all</label>
               </div>
             </div>

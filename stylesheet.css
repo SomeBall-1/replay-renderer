@@ -131,4 +131,5 @@ button.slick-prev::before, button.slick-next::before {
 }
 p {
     margin: 0;
+    transition: 0.5s ease-in-out;
 }

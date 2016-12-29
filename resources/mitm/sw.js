@@ -65,7 +65,7 @@ self.onfetch = event => {
 	let hijacke = map.get(url)
 	let listener, filename, headers
 
-	//console.log("Handleing ", url)
+	console.log("Handleing ", url)
 
 	if(!hijacke) return null
 
