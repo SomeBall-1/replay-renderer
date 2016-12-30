@@ -248,8 +248,11 @@ $(document).ready(function() {
         clearTimeout(frameTimeout);
         visible = false;
         let toGo = currentFpsDelay-(e.timeStamp-frameStart)-3; //semi-random 3 since it has a slight delay
-        if(toGo<0 || isNaN(toGo)) toGo = 0;
-        at.delay(nextFrame,toGo);
+        if(toGo<0 || isNaN(toGo)) {
+          nextFrame();
+        } else {
+          at.delay(nextFrame,toGo);
+        }
       } else {
         visible = true;
         if(rendering) renderReplay();

@@ -15,9 +15,9 @@
 		}
 	}
 
-	streamSaver.mitm = 'https://jimmywarting.github.io/StreamSaver.js/mitm.html?version=' +
-		streamSaver.version.full
-  //streamSaver.mitm = 'resources/mitm/mitm.html'
+	//streamSaver.mitm = 'https://jimmywarting.github.io/StreamSaver.js/mitm.html?version=' +
+	//	streamSaver.version.full
+  streamSaver.mitm = 'resources/mitm/mitm.html'
 
 	try {
 		// Some browser has it but ain't allowed to construct a stream yet
