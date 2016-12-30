@@ -107,7 +107,7 @@
 			},
 			close() {
 				channel.port1.postMessage('end')
-				console.log('All data successfully read!')
+				console.log('.zip data stream complete')
 			},
 			abort(e) {
 				channel.port1.postMessage('abort')

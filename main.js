@@ -52,13 +52,17 @@ $(document).ready(function() {
       let blob = new Blob(chunks, {type: 'video/webm'});
       let url = URL.createObjectURL(blob);
       let $slide = slicker.$slides.eq(currentIndex);
-      $slide.data('webm',url);
-      $slide.addClass('complete');
-      delete toRender[currentIndex];
+      checkValidURL(url).then(function(code) { //on success (resolve)
+        $slide.data('webm',url);
+        $slide.addClass('complete');
     
-      if(settings.webm) {
-        downloadFile(url,$slide.data('name'),'webm');
-      }
+        if(settings.webm) {
+          downloadFile(url,$slide.data('name'),'webm');
+        }
+      }, function(code) { //on error (reject)
+        $slide.addClass('error');
+      });
+      delete toRender[currentIndex];
       currentIndex++;
       beginRendering();
     } else if(skipping) {
@@ -112,6 +116,22 @@ $(document).ready(function() {
     },100);
   }
   
+  function checkValidURL(url) {
+    return new Promise(function(resolve,reject) {
+      let xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'blob';
+      xhr.onload = function(e) {
+        if(this.status === 200) {
+          resolve(this.status);
+        } else {
+          reject(this.status); //404 is the issue
+        }
+      };
+      xhr.send();
+    });
+  }
+  
   function getBlob(index,callback) {
     let $slide = slicker.$slides.eq(index);
     if(!$slide.hasClass('complete')) return callback(false);
@@ -141,7 +161,6 @@ $(document).ready(function() {
     let zipper = new JSZip();
     function addFile(ind) {
       if(ind<slicker.slideCount) {
-        console.log('starting:',ind);
         getBlob(ind,function(goodfile,filename,blob) {
           if(goodfile) {
             let reader = new FileReader();
@@ -164,7 +183,6 @@ $(document).ready(function() {
               filenames.push(filename);
                         
               zipper.file(filename+ext,rs);
-              console.log('finished:',ind);
               addFile(++ind);
             }
             reader.readAsArrayBuffer(blob)
@@ -181,7 +199,7 @@ $(document).ready(function() {
           },3000,$danger);
           return false;
         }
-        let writeStream = streamSaver.createWriteStream('output.zip').getWriter();
+        let writeStream = streamSaver.createWriteStream(filenames.length+(filenames.length===1?'_replay':'_replays')+'.zip').getWriter();
         return zipper.generateInternalStream({type: 'uint8array', streamFiles: true})
         .on('data', data => writeStream.write(data))
         .on('error', err => console.error(err))

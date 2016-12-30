@@ -81,7 +81,8 @@ self.onfetch = event => {
 		.replace(/\*/g, '%2A')
 
 	headers = {
-		'Content-Type': 'application/octet-stream; charset=utf-8',
+		//'Content-Type': 'application/octet-stream; charset=utf-8',
+    'Content-Type': 'text/html; charset=utf-8',
 		'Content-Disposition': "attachment; filename*=UTF-8''" + filename
 	}
 
