@@ -453,6 +453,31 @@ $(document).ready(function() {
     updateSlideCounter(false,slicker,slicker.currentSlide);
   }
   
+  let jsons = [];
+  function handleFile(file,callback,i) {
+    let reader = new FileReader();
+    reader.onload = (function(file) {
+      return function(e) {
+        let json = {};
+        try {
+          json = $.parseJSON(e.target.result || '{}');
+        } catch(e) {
+        }
+        jsons.push([file.name,json]);
+        callback(i);
+      }
+    })(file);
+    try {
+      if(file.type!=='text/plain') {
+        throw Error();
+      }
+      reader.readAsText(file);
+    } catch(e) {
+      jsons.push([file.name,{}]);
+      callback(i);
+    }
+  }
+  
   let mouseover = 0;
   $(document).on('dragenter',function(e) {
     e.preventDefault();
@@ -480,10 +505,8 @@ $(document).ready(function() {
     $('#filedrag').css('background-color','rgba(0,0,200,0.75)');
     $('#filedrag b').css('color','white').text('Uploading Replays...');
     let eventItems = e.originalEvent.dataTransfer.items,
-    items = [],
-    reader = new FileReader(),
-    jsons = [],
-    current = 0;
+    items = [];
+    jsons = [];
     for(let i = 0;i < eventItems.length;i++) {
       items.push(eventItems[i].webkitGetAsEntry());
     }
@@ -493,26 +516,7 @@ $(document).ready(function() {
       if(item.isFile) {
         //Get file
         item.file(function(file) {
-          reader.onload = (function(file) {
-            return function(e) {
-              let json = {};
-              try {
-                json = $.parseJSON(e.target.result || '{}');
-              } catch(e) {
-              }
-              jsons.push([file.name,json]);
-              callback(i);
-            }
-          })(file);
-          try {
-            if(file.type!=='text/plain') {
-              throw Error();
-            }
-            reader.readAsText(file);
-          } catch(e) {
-            jsons.push([file.name,{}]);
-            callback(i);
-          }
+          handleFile(file,callback,i);
         });
       } else if(item.isDirectory) {
         //Get folder contents
@@ -543,6 +547,24 @@ $(document).ready(function() {
     }
     loadItems(0);
   });
+  
+  $('#uploader').on('change',function(event) {
+    $('#filedrag').css('background-color','rgba(0,0,200,0.75)');
+    $('#filedrag b').css('color','white').text('Uploading Replays...');
+    $('#filedrag').show();
+    jsons = [];
+    let files = $('#uploader')[0].files;
+    function traverse(index) {
+      if(index<files.length) {
+        handleFile(files[index],traverse,++index);
+      } else {
+        $('#filedrag').hide().css('background-color','rgba(100,100,100,0.75)');
+        $('#filedrag b').css('color','black').text('Drop Replay Files Here');
+        dropComplete(jsons);
+      }
+    }
+    traverse(0);
+  })
   /*END FILEHANDLING STUFF*/
   
   /*SETTINGS AND TEXTURE PICKING STUFF*/
